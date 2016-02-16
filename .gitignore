@@ -26,3 +26,7 @@
 *.exe
 *.out
 *.app
+
+# Compiling directories
+Executables/*
+PreProcessed/*
