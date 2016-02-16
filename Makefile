@@ -6,11 +6,11 @@
 #----------------------------------------------------------------------------
 
 # Executable name
-EXENAME = dorabella
+EXENAME = leporello
 
 # Print relevant output to log file
 LOGFILE = yes
-LOGNAME = dorabella.log
+LOGNAME = leporello.log
 
 # Compiler ( gfortran, ifort )
 FC = ifort     

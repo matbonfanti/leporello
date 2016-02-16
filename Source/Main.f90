@@ -1,7 +1,7 @@
 !***************************************************************************************
 !*                              PROGRAM leporello
 !***************************************************************************************
-!>  \mainpage      Program dorabella - version 1
+!>  \mainpage      Program leporello - version 1
 !>
 !>  Classical simulations of H + H + C(graphene) + dissipative bath       \n
 !>  * Model: 1D for Hinc + 1D for Htar + 1D Z coordinate for carbon atom  \n
@@ -79,7 +79,7 @@ PROGRAM leporello
    ENDIF
    IF (Help) THEN ! Call help
       PRINT*, ' Launch this program as:'
-      PRINT*, ' % dorabella "InputFileName" '
+      PRINT*, ' % leporello "InputFileName" '
       STOP
    ENDIF
 
