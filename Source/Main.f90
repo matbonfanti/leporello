@@ -56,12 +56,12 @@ PROGRAM leporello
    PRINT "(       '                    ==============================',/)"
    PRINT "(       '                       Author: Matteo Bonfanti  ',/)"
 
-   PRINT "(       '                       << Notte e giorno faticar      ')"
-   PRINT "(       '                         per chi nulla sa gradir      ')"
-   PRINT "(       '                         piova e vento sopportar,     ')"
-   PRINT "(       '                        mangiar male e mal dormir...  ')"
-   PRINT "(       '                         Voglio far il gentiluomo,    ')"
-   PRINT "(       '                        e non voglio più servir... >> '/)"
+   PRINT "(       '                       << Notte e giorno faticar      ')"
+   PRINT "(       '                         per chi nulla sa gradir      ')"
+   PRINT "(       '                         piova e vento sopportar,     ')"
+   PRINT "(       '                        mangiar male e mal dormir...  ')"
+   PRINT "(       '                         Voglio far il gentiluomo,    ')"
+   PRINT "(       '                        e non voglio più servir... >> '/)"
    PRINT "(       '                      [Don Giovanni act I scene 1]  ',2/)"
    CALL date_and_time (values=Time1)
 
