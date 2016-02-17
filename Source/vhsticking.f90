@@ -6,8 +6,8 @@
 
    SUBROUTINE hstick( rhx, rhy, rhz, rcz ,vv, dv_rhx, dv_rhy, dv_rhz, dv_rcz ) 
       IMPLICIT NONE
-      REAL*8  rhx, rhy, rhz, rcz, vv
-      REAL*8  dv_rhx, dv_rhy, dv_rhz, dv_rcz
+      REAL*8, INTENT(IN)  :: rhx, rhy, rhz, rcz
+      REAL*8, INTENT(OUT) :: vv, dv_rhx, dv_rhy, dv_rhz, dv_rcz
 
       LOGICAL, DIMENSION(124) :: OptMask
       REAL*8, DIMENSION(124) :: Dummy

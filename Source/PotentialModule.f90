@@ -118,9 +118,9 @@ MODULE PotentialModule
          REAL, DIMENSION(SIZE(Positions))        :: Dummy
 
          INTERFACE
-            SUBROUTINE ER_3D (zi, zt, zc, vv)
+            SUBROUTINE ER_3D (zi, zt, zc, vv, dv_zi, dv_zt, dv_zc)
                REAL*8, INTENT (IN) :: zi, zt, zc
-               REAL*8 :: vv
+               REAL*8, INTENT(OUT) :: vv, dv_zi, dv_zt, dv_zc
             END SUBROUTINE
           END INTERFACE
 
@@ -151,9 +151,9 @@ MODULE PotentialModule
          REAL, DIMENSION(SIZE(Positions)), TARGET, INTENT(OUT) :: Forces 
 
          INTERFACE
-            SUBROUTINE ER_3D (zi, zt, zc, vv)
+            SUBROUTINE ER_3D (zi, zt, zc, vv, dv_zi, dv_zt, dv_zc)
                REAL*8, INTENT (IN) :: zi, zt, zc
-               REAL*8 :: vv
+               REAL*8, INTENT(OUT) :: vv, dv_zi, dv_zt, dv_zc
             END SUBROUTINE
           END INTERFACE
 

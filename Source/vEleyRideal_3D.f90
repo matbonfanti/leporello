@@ -51,20 +51,9 @@
   REAL*8, PARAMETER :: MyConsts_Hartree2eV = 27.21138505d0	!conversion factor from Hartree to eV
 
   INTERFACE
-   SUBROUTINE hstick_carbon( rcz, vv )
-      REAL*8  rcz, vv
-   END SUBROUTINE
-  END INTERFACE
-
-  INTERFACE   
-    SUBROUTINE hstick_hydro( rhx, rhy, rhz, vv )
-      REAL*8  rhx, rhy, rhz, vv
-    END SUBROUTINE
-  END INTERFACE
-
-  INTERFACE
-    SUBROUTINE hstick_coupling( rhx, rhy, rhz, rcz ,vv )
-      REAL*8  rhx, rhy, rhz, rcz, vv
+    SUBROUTINE hstick( rhx, rhy, rhz, rcz ,vv, dv_rhx, dv_rhy, dv_rhz, dv_rcz )
+      REAL*8, INTENT(IN)  :: rhx, rhy, rhz, rcz
+      REAL*8, INTENT(OUT) :: vv, dv_rhx, dv_rhy, dv_rhz, dv_rcz
     END SUBROUTINE
   END INTERFACE
 
@@ -174,7 +163,7 @@
 !N.B. everything is in a.u.
 
   !sticking potential for targon and C: it has three parts
-  CALL hstick_coupling( 0.0d0, 0.0d0, zt, zc, vstick, dvstick_dxt, dvstick_dyt, dvstick_dzt, dvstick_dzc )
+  CALL hstick( 0.0d0, 0.0d0, zt, zc, vstick, dvstick_dxt, dvstick_dyt, dvstick_dzt, dvstick_dzc )
 
   !full potential
   vv = vdiab - vmorse + vstick 
