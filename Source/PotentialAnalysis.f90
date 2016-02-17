@@ -217,8 +217,13 @@ MODULE PotentialAnalysis
 
       WRITE(*,"(/,A)") " Potential normal modes at the starting geometry" 
       DO i = 1, NDim 
-         WRITE(*,503) i, SQRT(EigenFreq(i))*FreqConversion(InternalUnits,InputUnits), FreqUnit(InputUnits), &
+         IF ( EigenFreq(i) > 0.0 ) THEN
+            WRITE(*,503) i, SQRT(EigenFreq(i))*FreqConversion(InternalUnits,InputUnits), FreqUnit(InputUnits), &
                       TRIM(LengthUnit(InternalUnits)), EigenModes(:,i)
+         ELSE
+            WRITE(*,504) i, SQRT(-EigenFreq(i))*FreqConversion(InternalUnits,InputUnits), FreqUnit(InputUnits), &
+                      TRIM(LengthUnit(InternalUnits)), EigenModes(:,i)
+         END IF
       END DO
 
       PRINT "(/,A)",    " **** Minimum energy path ****"
@@ -230,43 +235,54 @@ MODULE PotentialAnalysis
       X(:) = XStart; E = GetPotential( X )
       ! Write to output file and to screen the starting point
       WRITE(*,601) -1, X(1)*LengthConversion(InternalUnits, InputUnits), &
-         X(2)*LengthConversion(InternalUnits, InputUnits), E*EnergyConversion(InternalUnits, InputUnits)
+         X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
+         E*EnergyConversion(InternalUnits, InputUnits)
 
       ! First follow the incident direction until significant gradient is found
       DO i = 1, 1000
          ! Move along the entrance channel
-         X(1) = X(1) - 0.01
+         X(1) = X(1) - 0.05
          ! Compute norm of the gradient
          E = GetPotAndForces( X, A ); GradNorm = SQRT(TheOneWithVectorDotVector(A, A))
          ! Check when the gradient is large
-         IF ( GradNorm > 0.001 ) EXIT
+         IF ( GradNorm > 0.005 ) EXIT
       END DO
 
       ! Write to output file and to screen the starting point
       WRITE(*,601) 0, X(1)*LengthConversion(InternalUnits, InputUnits), &
-         X(2)*LengthConversion(InternalUnits, InputUnits), E*EnergyConversion(InternalUnits, InputUnits)
+         X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
+            E*EnergyConversion(InternalUnits, InputUnits)
 
       DO i = 2, MaxMEPNrSteps
          ! Following steps
          Check = FollowGradient( X, MEPStep )
          IF ( .NOT. Check )  EXIT
+         IF ( MOD(i,MaxMEPNrSteps/20) == 0 ) THEN
+             E = GetPotential( X )
+             WRITE(*,601) i, X(2)*LengthConversion(InternalUnits, InputUnits), &
+            X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
+               E*EnergyConversion(InternalUnits, InputUnits)
+         END IF
       END DO
       MaxStep = i - 1
 
       ! Write to screen final step
       E = GetPotential( X )
       WRITE(*,601) MaxStep, X(1)*LengthConversion(InternalUnits, InputUnits), &
-         X(2)*LengthConversion(InternalUnits, InputUnits), E*EnergyConversion(InternalUnits, InputUnits)
+            X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
+               E*EnergyConversion(InternalUnits, InputUnits)
 
       WRITE(*,"(/,A)") " * Last step reached... MEP written to file ________"
 
-      501 FORMAT( " * ",A5,23X,1F15.6,1X,A,/ )
+      501 FORMAT( " * ",A5,23X,1F15.6,1X,A )
       502 FORMAT( " * Energy",22X,1F15.6,1X,A,/ )
-      503 FORMAT( " Normal Mode ",I5," - frequency: ",1F15.2,1X,A, /, &
+      503 FORMAT( " Normal Mode ",I5," - real frequency: ",1F15.2,1X,A, /, &
+                  "    mass-scaled coords of the normal mode / ",A," : ",4F12.6, / )
+      504 FORMAT( " Normal Mode ",I5," - imag frequency: ",1F15.2,1X,A, /, &
                   "    mass-scaled coords of the normal mode / ",A," : ",4F12.6, / )
 
       600 FORMAT ( A12,A20,A20,A20 )
-      601 FORMAT ( I12,F20.6,F20.6,F20.6 )
+      601 FORMAT ( I12,F20.6,F20.6,F20.6,F20.6 )
       602 FORMAT ( F20.6,F20.6,F20.6,F20.6 )
 
       700 FORMAT ( "#  N Step   ", "   zH Coord / ", A6, "   zC Coord / ", A6, "     Energy / ", A6, /,  &
@@ -336,18 +352,21 @@ MODULE PotentialAnalysis
       LOGICAL, DIMENSION(SIZE(X)), INTENT(IN), OPTIONAL :: Mask
 
       REAL, DIMENSION(SIZE(X)) :: Forces
+      LOGICAL, DIMENSION(SIZE(X)) :: LogMask
       REAL, DIMENSION(SIZE(X)) :: Kappa1, Kappa2, Kappa3, Kappa4, Step
 
       REAL :: V, FMax
       INTEGER :: i
 
+      IF ( PRESENT(Mask) ) THEN
+         LogMask = Mask
+      ELSE 
+         LogMask = .TRUE.
+      END IF
+
       ! compute forces at current position and the maximum component
       V = GetPotAndForces( X, Forces )
-      IF ( PRESENT(Mask) ) THEN
-         FMax = MAXVAL( ABS(Forces), Mask )
-      ELSE 
-         FMax = MAXVAL( ABS(Forces) )
-      END IF
+      FMax = MAXVAL( ABS(Forces), LogMask )
 
       ! Check if forces would result in a negligible step
       IF ( FMax < 1.E-4 )  THEN
@@ -355,23 +374,19 @@ MODULE PotentialAnalysis
          FollowGradient = .FALSE.
       ELSE
          ! Make a runge kutta 4th order step
-         Kappa1 = NormalizedForces( Forces, Mask )
+         Kappa1 = NormalizedForces( Forces, LogMask )
          V = GetPotAndForces( X + 0.5*ABS(StepLength)*Kappa1, Forces )
-         Kappa2 = NormalizedForces( Forces, Mask )
+         Kappa2 = NormalizedForces( Forces, LogMask )
          V = GetPotAndForces( X + 0.5*ABS(StepLength)*Kappa2, Forces )
-         Kappa3 = NormalizedForces( Forces, Mask )
+         Kappa3 = NormalizedForces( Forces, LogMask )
          V = GetPotAndForces( X + ABS(StepLength)*Kappa3, Forces )
-         Kappa4 = NormalizedForces( Forces, Mask )
+         Kappa4 = NormalizedForces( Forces, LogMask )
          Step = ( Kappa1/6.0 + Kappa2/3.0 + Kappa3/3.0 + Kappa4/6.0 )
 
          ! move uncostrained coordinates in the direction of the forces
-         IF ( PRESENT(Mask) ) THEN
-            DO i = 1, size(X)
-               IF ( Mask(i) ) X(i) = X(i) + ABS(StepLength) * Step(i)
-            END DO
-         ELSE
-            X(:) = X(:) + ABS(StepLength) * Step(:)
-         END IF
+         DO i = 1, size(X)
+            IF ( LogMask(i) ) X(i) = X(i) + ABS(StepLength) * Step(i)
+         END DO
          ! Return TRUE value
          FollowGradient = .TRUE.
       END IF
