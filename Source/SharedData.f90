@@ -48,6 +48,9 @@ MODULE SharedData
    !> Gamma of the relaxation during dynamics (its meaning depends on the bath representation)
    REAL    :: DynamicsGamma             
 
+   !> Logical variable to perform the tests on the derivatives of the potential !!! the code is terminated after the tests !!!
+   LOGICAL :: DerivTesting
+
    ! INFORMATION ON THE SYSTEM
 
    REAL    :: MassHTar                  !< Mass of the target hydrogen atom

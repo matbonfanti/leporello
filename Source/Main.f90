@@ -191,6 +191,8 @@ PROGRAM leporello
 
    END IF
 
+   ! Variable to set the potential derivatives testing
+   CALL SetFieldFromInput( InputData, "DerivTesting", DerivTesting, .FALSE. )
 
    !*************************************************************
    !       PRINT OF THE INPUT DATA TO STD OUT
@@ -286,7 +288,7 @@ PROGRAM leporello
    !*************************************************************
 
    ! Setup potential energy surface
-   CALL SetupPotential(   )
+   CALL SetupPotential( DerivTesting  )
 
    !*************************************************************
    !       IO BATH SETUP 

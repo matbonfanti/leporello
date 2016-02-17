@@ -55,4 +55,7 @@ MassHInc  : 1.00782503207
 # mass of the substrate C atoms 
 MassC  : 12.0
 
+# testing the derivatives of the potential
+DerivTesting : TRUE
+
 # -------------------------------- END OF INPUT FILE -------------------------------------

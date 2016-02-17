@@ -46,9 +46,9 @@ MODULE PotentialModule
    CHARACTER(5), DIMENSION(:), ALLOCATABLE, SAVE :: CoordLabels
 
    !> Number of random generated points for the derivative testing
-   INTEGER, PARAMETER :: NPointsTest = 10.**4
+   INTEGER, PARAMETER :: NPointsTest = 10.**3
    !> Step for computing the numerical derivatives with finite differences
-   REAL, PARAMETER :: SmallDelta = 1.E-04
+   REAL, PARAMETER :: SmallDelta = 0.00001
 
    CONTAINS
 
@@ -593,9 +593,13 @@ MODULE PotentialModule
       SUBROUTINE TestForces( CoordMin, CoordMax ) 
          IMPLICIT NONE
          REAL, DIMENSION(:), INTENT(IN) :: CoordMin, CoordMax
+! 
+!          REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
+!          REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /) 
 
-         REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
-         REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /) 
+         REAL, DIMENSION(6), PARAMETER :: Deltas = (/ -3.0,    -2.0,    -1.0,    +1.0,     +2.0,    +3.0  /)
+         REAL, DIMENSION(6), PARAMETER :: Coeffs = (/ -1./60., 3./20.,  -3./4.,  3./4., -3./20.,   1./60. /) 
+
 
          TYPE(RNGInternalState) :: Random
 
@@ -603,7 +607,7 @@ MODULE PotentialModule
          REAL, DIMENSION(:), ALLOCATABLE  :: Average, Deviation
 
          REAL    :: V
-         INTEGER :: iPnt, iCoord, iDispl
+         INTEGER :: iPnt, iCoord, iDispl, NSelected
          CHARACTER(16) :: ForceUnit
 
          ! Error if module not have been setup yet
@@ -619,6 +623,9 @@ MODULE PotentialModule
          ! Initialize random number generator
          CALL SetSeed( Random, -512 )
 
+         Average = 0.0
+         Deviation = 0.0
+         NSelected = 0
          DO iPnt = 1, NPointsTest
             
             ! generate random numbers for the coordinates
@@ -629,29 +636,44 @@ MODULE PotentialModule
             ! Compute analytical derivatives
             V = GetPotAndForces( AtPoint, AnalyticalDerivs )
 
-            ! Compute numerical derivatives
-            NumericalDerivs(:) = 0.0
-            DO iCoord = 1, NDim 
-               DO iDispl = 1, size(Deltas)
-                  ! Define small displacement from the point where compute the derivative
-                  Coordinates(:) = AtPoint(:)
-                  Coordinates(iCoord) = Coordinates(iCoord) + Deltas(iDispl)*SmallDelta
-                  ! Compute potential in the displaced coordinate
-                  V = GetPotential( Coordinates )
-                  ! Increment numerical derivative
-                  NumericalDerivs(iCoord) = NumericalDerivs(iCoord) + Coeffs(iDispl)*V/SmallDelta
-               END DO
-            END DO
+            IF ( V < 0.5 ) THEN
+               NSelected = NSelected + 1
 
-            ! Accumulate to compute average and root mean squared deviations
-            Average = Average + ( NumericalDerivs - AnalyticalDerivs )
-            Deviation = Deviation + ( NumericalDerivs - AnalyticalDerivs )**2
+               ! Compute numerical derivatives
+               NumericalDerivs(:) = 0.0
+               DO iCoord = 1, NDim 
+                  DO iDispl = 1, size(Deltas)
+                     ! Define small displacement from the point where compute the derivative
+                     Coordinates(:) = AtPoint(:)
+                     Coordinates(iCoord) = Coordinates(iCoord) + Deltas(iDispl)*SmallDelta
+                     ! Compute potential in the displaced coordinate
+                     V = GetPotential( Coordinates )
+                     ! Increment numerical derivative
+                     NumericalDerivs(iCoord) = NumericalDerivs(iCoord) + Coeffs(iDispl)*V
+                  END DO
+               END DO
+               NumericalDerivs(:) = NumericalDerivs(:) / SmallDelta
+
+               ! Accumulate to compute average and root mean squared deviations
+               Average = Average + ( NumericalDerivs - AnalyticalDerivs )
+               Deviation = Deviation + ( NumericalDerivs - AnalyticalDerivs )**2
+
+!                IF ( ANY( ABS(AnalyticalDerivs(:) - NumericalDerivs(:)) > 1.E-3 ) ) THEN 
+!                PRINT*, " "
+!                PRINT*, V*EnergyConversion(InternalUnits,InputUnits)
+!                PRINT*, AtPoint(:)*LengthConversion(InternalUnits,InputUnits)
+!                PRINT*, (AnalyticalDerivs(:) - NumericalDerivs(:)) *ForceConversion(InternalUnits,InputUnits)
+!                PRINT*, SUM(NumericalDerivs(:)) *ForceConversion(InternalUnits,InputUnits)
+!                PRINT*, SUM(AnalyticalDerivs(:)) *ForceConversion(InternalUnits,InputUnits)
+!                END IF
+
+            END IF
 
          END DO
 
          ! Normalize averages
-         Average = Average / NPointsTest
-         Deviation = SQRT(Deviation / NPointsTest)
+         Average = Average / NSelected
+         Deviation = SQRT(Deviation / NSelected)
 
          ! Print results to screen
          PRINT "(2/,A)",    " ***************************************************"
@@ -659,6 +681,7 @@ MODULE PotentialModule
          PRINT "(A,/)" ,    " ***************************************************"
 
          WRITE(*,300) NPointsTest
+         WRITE(*,302) NSelected
             
          ForceUnit = TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits))
          DO iCoord = 1, NDim 
@@ -667,9 +690,11 @@ MODULE PotentialModule
                          CoordMax(iCoord)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits), &
                          Average(iCoord)*ForceConversion(InternalUnits,InputUnits), ForceUnit,                &
                          Deviation(iCoord)*ForceConversion(InternalUnits,InputUnits), ForceUnit
+
          END DO
 
-         300 FORMAT(" * Number of points where dV's are evaluated:   ",I10,  2/)
+         300 FORMAT(" * Number of points where dV's are evaluated:   ",I10 )
+         302 FORMAT(" * Number of points kept for the averages:      ",I10,2/)
          301 FORMAT(" * Coordinate ",A,/,&
                     "      min for the sampling:                     "F10.4,1X,A,/,& 
                     "      max for the sampling:                     "F10.4,1X,A,/,& 
