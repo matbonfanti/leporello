@@ -292,6 +292,34 @@ MODULE PotentialAnalysis
 !===============================================================================================================================
 
 !**************************************************************************************
+!> Compute the Hessian of the potential in multiplied by the square root 
+!> of the masses, as it is needed for the normal modes analysis  
+!>
+!> @param AtPoint   Input vector with the coordinates where to compute H
+!> @returns         Hessian matrix of the potential in AtPoint
+!**************************************************************************************
+      FUNCTION GetHessian( AtPoint ) RESULT( Hessian )
+         REAL, DIMENSION(:), INTENT(IN)                 :: AtPoint
+         REAL, DIMENSION(size(AtPoint),size(AtPoint))   :: Hessian
+         INTEGER :: i,j
+
+         ! Check the number of degree of freedom
+         CALL ERROR( size(AtPoint) /= NDim, "PotentialModule.GetHessian: input array dimension mismatch" )
+
+         ! Use subroutine GetSecondDerivatives to compute the matrix of the 2nd derivatives
+         Hessian(:,:) = GetSecondDerivatives( AtPoint ) 
+         ! Numerical hessian of the potential in mass weighted coordinates
+         DO j = 1, NDim
+            DO i = 1, NDim
+               Hessian(i,j) = Hessian(i,j) / SQRT( MassVector(i)*MassVector(j) )
+            END DO
+         END DO
+
+      END FUNCTION GetHessian
+
+!===============================================================================================================================
+
+!**************************************************************************************
 !> Follow gradient integrating the MEP differential equation, 
 !> solved with a runge-kutta 4th order step.
 !>

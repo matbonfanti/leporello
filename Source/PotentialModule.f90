@@ -30,10 +30,9 @@ MODULE PotentialModule
    USE UnitConversion
 
    PRIVATE
-   PUBLIC :: SetupPotential                       !< setup subroutine
-   PUBLIC :: GetXLabel                            !< info subroutines
-   PUBLIC :: GetPotential, GetPotAndForces        !< get potential and forces
-   PUBLIC :: GetHessian, GetSecondDerivatives     !< get second derivatives and Hessian
+   PUBLIC :: SetupPotential                                        !< setup subroutine
+   PUBLIC :: GetXLabel                                             !< info subroutines
+   PUBLIC :: GetPotential, GetPotAndForces, GetSecondDerivatives   !< get potential and forces, and second derivatives
    PUBLIC :: SteepLocator, NewtonLocator          !< optimization and stationary points
 
    !> Setup variable for the potential
@@ -212,39 +211,40 @@ MODULE PotentialModule
          REAL, DIMENSION(:), INTENT(IN)                 :: AtPoint
          REAL, DIMENSION(size(AtPoint),size(AtPoint))   :: SecDeriv
 
+         REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
+         REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /) 
+
+         REAL, DIMENSION(size(AtPoint)) :: Coordinates, FirstDerivative
+         REAL :: Potential
+         INTEGER :: i,k
+
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetSecondDerivatives : module not set" )
-
          ! Check the number of degree of freedom
          CALL ERROR( size(AtPoint) /= NDim, "PotentialModule.GetSecondDerivatives: input array dimension mismatch" )
 
-         SecDeriv(:,:) = 0.0
+         DO i = 1, NDim
+            DO k = 1, size(Deltas)
+
+               ! Define small displacement from the point where compute the derivative
+               Coordinates(:) = AtPoint(:)
+               Coordinates(i) = Coordinates(i) + Deltas(k)*SmallDelta
+
+               ! Compute potential and forces in the displaced coordinate
+               Potential = GetPotAndForces( Coordinates, FirstDerivative )
+               FirstDerivative = - FirstDerivative
+
+               ! Increment numerical derivative of the analytical derivative
+               SecDeriv(i,:) = SecDeriv(i,:) + Coeffs(k)*FirstDerivative(:)
+
+            END DO
+         END DO
+
+         SecDeriv(:,:) = SecDeriv(:,:)/SmallDelta
+!        CALL TheOneWithMatrixPrintedLineAfterLine( SecDeriv )
 
       END FUNCTION GetSecondDerivatives
  
-!===============================================================================================================================
-
-!**************************************************************************************
-!> Compute the Hessian of the potential in multiplied by the square root 
-!> of the masses, as it is needed for the normal modes analysis  
-!>
-!> @param AtPoint   Input vector with the coordinates where to compute H
-!> @returns         Hessian matrix of the potential in AtPoint
-!**************************************************************************************
-      FUNCTION GetHessian( AtPoint ) RESULT( Hessian )
-         REAL, DIMENSION(:), INTENT(IN)                 :: AtPoint
-         REAL, DIMENSION(size(AtPoint),size(AtPoint))   :: Hessian
-
-         ! Error if module not have been setup yet
-         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetHessian : module not set" )
-
-         ! Check the number of degree of freedom
-         CALL ERROR( size(AtPoint) /= NDim, "PotentialModule.GetHessian: input array dimension mismatch" )
-
-         Hessian(:,:) = 0.0
-
-      END FUNCTION GetHessian
-
 !===============================================================================================================================
 
 !**************************************************************************************
@@ -377,7 +377,7 @@ MODULE PotentialModule
 
 #if defined(LOG_FILE)
          ! Check the number of imaginary frequencies
-         Hessian = GetHessian( StationaryPoint )
+         Hessian = GetSecondDerivatives( StationaryPoint )
          CALL TheOneWithDiagonalization( Hessian, EigenVectors, EigenValues )
          WRITE(__LOG_UNIT,"(/,A,I3,A,/)") " SteepLocator | Final stationary point has ", COUNT( EigenValues < 0.0 ),   &
                                  " imaginary frequency/ies "
@@ -562,11 +562,11 @@ MODULE PotentialModule
          ! Check the number of imaginary frequencies
          IF ( PRESENT(Mask) ) THEN
             ! Compute constrained Hessian at current position
-            Hessian = GetHessian( CurrentX )
+            Hessian = GetSecondDerivatives( CurrentX )
             WrkHessian = ConstrainedHessian( Hessian, Mask )
          ELSE
             ! compute Hessian at current position
-            WrkHessian = GetHessian( CurrentX )
+            WrkHessian = GetSecondDerivatives( CurrentX )
          END IF
          ! Diagonalize Hessian to transform coords to normal modes
          CALL TheOneWithDiagonalization( WrkHessian, EigenVectors, EigenValues )
@@ -819,85 +819,6 @@ END MODULE PotentialModule
 ! ! ************************************************************************************
 ! 
  
-!    !*************************************************************************************************
-! 
-!    FUNCTION HessianOfThePotential( AtPoint ) RESULT( Hessian )
-!       REAL, DIMENSION(NDim,NDim) :: Hessian
-!       REAL, DIMENSION(NDim), INTENT(IN) :: AtPoint
-!       REAL, DIMENSION(NDim) :: Coordinates, FirstDerivative
-!       REAL, DIMENSION(NBath) :: CouplingsCoeffs
-!       REAL :: DistortionCoeff, Potential
-!       INTEGER :: i, j, k
-! 
-!       REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
-!       REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /) 
-! 
-!       REAL, DIMENSION(3), PARAMETER :: ForwardDeltas = (/  0.0,   +1.0,  +2.0   /)
-!       REAL, DIMENSION(3), PARAMETER :: ForwardCoeffs = (/ -3./2., +2.0,  -1./2. /) 
-! 
-!       Hessian(:,:) = 0.0
-! 
-
-!          ! Compute the second derivatives for displacements of x and y
-!          ! IMPORTANT!!! since rho = 0 is a singular value of the function, 
-!          ! the derivative is computed slightly off the minimum, and is computed for x,y > 0
-!          DO i = 1, 2
-!             DO k = 1, size(ForwardDeltas)
-! 
-!                ! Define small displacement from the point where compute the derivative
-!                Coordinates(:) = AtPoint(:)
-!                IF ( Coordinates(i) < 0.0 ) THEN
-!                   Coordinates(i) = - Coordinates(i)
-!                END IF
-! 
-!                IF ( Coordinates(i) < 0.001 ) THEN
-!                   Coordinates(i) = Coordinates(i) + 0.001 + ForwardDeltas(k)*SmallDelta
-!                ELSE
-!                   Coordinates(i) = Coordinates(i) + ForwardDeltas(k)*SmallDelta
-!                END IF
-! 
-!                ! Compute potential and forces in the displaced coordinate
-!                Potential = VHSticking( Coordinates, FirstDerivative )
-!                FirstDerivative = - FirstDerivative
-! 
-!                ! Increment numerical derivative of the analytical derivative
-!                Hessian(i,:) = Hessian(i,:) + ForwardCoeffs(k)*FirstDerivative(:)/SmallDelta
-! 
-!             END DO
-!          END DO
-! 
-!          DO i = 3, NDim
-!             DO k = 1, size(Deltas)
-! 
-!                ! Define small displacement from the point where compute the derivative
-!                Coordinates(:) = AtPoint(:)
-!                Coordinates(i) = Coordinates(i) + Deltas(k)*SmallDelta
-! 
-!                ! Compute potential and forces in the displaced coordinate
-!                Potential = VHSticking( Coordinates, FirstDerivative )
-!                FirstDerivative = - FirstDerivative
-! 
-!                ! Increment numerical derivative of the analytical derivative
-!                Hessian(i,:) = Hessian(i,:) + Coeffs(k)*FirstDerivative(:)/SmallDelta
-! 
-!             END DO
-!          END DO
-! 
-!          ! Numerical mass scaled hessian of the full system+slab potential
-!          DO j = 1, NDim
-!             DO i = 1, NDim
-!                Hessian(i,j) = Hessian(i,j) / SQRT( MassVector(i)*MassVector(j) )
-!             END DO
-!          END DO
-! 
-
-! 
-! !       CALL TheOneWithMatrixPrintedLineAfterLine( Hessian )
-! 
-!    END FUNCTION HessianOfThePotential
-! 
-! !*************************************************************************************************
-! 
 !    REAL FUNCTION DirectionalSecondDerivative( AtPoint, Direction, NormalMode )
 !       IMPLICIT NONE
 !       REAL, DIMENSION(NDim), INTENT(IN) :: AtPoint, Direction, NormalMode
