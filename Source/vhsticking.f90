@@ -14,7 +14,7 @@
       REAL*8, DIMENSION(124), SAVE :: OptCoord = 0.0
       INTEGER :: iCoord
       REAL*8 :: vh, vc
-      REAL*8 :: EAsymptote = 1.D+100
+      REAL*8, SAVE :: EAsymptote = 1.D+100
 
       INTERFACE
          REAL*8 FUNCTION FullPotential( Positions, Forces )

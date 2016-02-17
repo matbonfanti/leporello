@@ -68,7 +68,7 @@
   ui = di/(4.0d0*(1.0d0+deltai))*((3.0d0+deltai)*exp(-2.0d0*alphai* &
        (ri-ai))-(2.0d0+6.0d0*deltai)*exp(-alphai*(ri-ai)))
 
-  d_ui = di*alphai/4.0d0*(1.0d0+deltai)*(-2.0d0*(3.0d0+deltai)* &
+  d_ui = di*alphai/4.0d0/(1.0d0+deltai)*(-2.0d0*(3.0d0+deltai)* &
 	 exp(-2.0d0*alphai*(ri-ai))+(2.0d0+6.0d0*deltai)* &
 	 exp(-alphai*(ri-ai)))
 
@@ -130,15 +130,15 @@
 	 *exp(-alpham*(r-am))*fm+exp(-alpham*(r-am))*d_fm))
 
   !compute the full diabatic potential and its partial derivatives
-  vdiab = ui+ut+um-sqrt((qm*qt*2+(qi+qt)**2-qm*(qi+qt)))
+  vdiab = ui+ut+um-sqrt((qm**2+(qi+qt)**2-qm*(qi+qt)))
 
-  dv_ri = d_ui-0.5d0*d_qi*((2.0d0*(qi+qt)-qm)/(sqrt(qm**2-(qi+qt)**2 &
+  dv_ri = d_ui-0.5d0*d_qi*((2.0d0*(qi+qt)-qm)/(sqrt(qm**2+(qi+qt)**2 &
 	  -qm*(qi+qt))))
 
-  dv_rt = d_ut-0.5d0*d_qt*((2.0d0*(qi+qt)-qm)/(sqrt(qm**2-(qi+qt)**2 &
+  dv_rt = d_ut-0.5d0*d_qt*((2.0d0*(qi+qt)-qm)/(sqrt(qm**2+(qi+qt)**2 &
 	  -qm*(qi+qt))))
 
-  dv_r = d_um-0.5d0*d_qm*((2.0d0*qm-qi-qt)/(sqrt(qm**2-(qi+qt)**2 &
+  dv_r = d_um-0.5d0*d_qm*((2.0d0*qm-qi-qt)/(sqrt(qm**2+(qi+qt)**2 &
 	  -qm*(qi+qt))))
 
   !convert the full potential in a.u.
@@ -169,13 +169,18 @@
   vv = vdiab - vmorse + vstick 
 
   ! sum derivatives
-  dv_zi = +dv_ri +dv_r
-  dv_zt = +dv_rt -dv_r  + dvstick_dzt
-  dv_zc = -dv_ri -dv_rt + dvstick_dzc
+  dv_zi = +dv_ri +dv_r*SIGN(1.0,ri-rt)
+  dv_zt = +dv_rt -dv_r*SIGN(1.0,ri-rt) + dvstick_dzt
+  dv_zc = -dv_ri -dv_rt                + dvstick_dzc
 
 !Upper and lower energy cutoff
-  if ( vv < -0.18d0 ) vv = -0.18d0
-  if ( vv > 0.735d0 ) vv = 0.735d0
+  if ( vv < -0.18d0 ) then
+       vv = -0.18d0
+       dv_zi = 0.; dv_zt=0.; dv_zc=0.
+  else if ( vv > 0.735d0 ) then
+       vv = 0.735d0
+       dv_zi = 0.; dv_zt=0.; dv_zc=0.
+  endif
 
 !convert the full potential in eV
 !  vv = vv * MyConsts_Hartree2eV
