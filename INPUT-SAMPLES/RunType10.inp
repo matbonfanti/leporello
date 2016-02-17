@@ -37,16 +37,16 @@ InputFreq   : 18
 
 # Potential plot
 # grid spacing (in all directions)
-Plot_GridSpacing : 0.1 
+Plot_GridSpacing : 0.5 
 # min and max along the incident H z coordinate
 Plot_ZHIncMin : 1.0
-Plot_ZHIncMax : 6.0
+Plot_ZHIncMax : 1.0
 # min and max along the target H z coordinate
 Plot_ZHTarMin : 0.0
-Plot_ZHTarMax : 4.0
+Plot_ZHTarMax : 0.0
 # min and max along the C z coordinate
 Plot_ZCMin    : -0.5
-Plot_ZCMax    : 1.2
+Plot_ZCMax    : -0.5
 
 # Masses
 # mass of the target and incident H atom 
@@ -56,6 +56,6 @@ MassHInc  : 1.00782503207
 MassC  : 12.0
 
 # testing the derivatives of the potential
-DerivTesting : TRUE
+DerivTesting : FALSE
 
 # -------------------------------- END OF INPUT FILE -------------------------------------

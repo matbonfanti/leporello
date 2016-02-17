@@ -123,9 +123,10 @@ MODULE PotentialAnalysis
       REAL, DIMENSION(:), ALLOCATABLE :: ZCArray, ZHIncArray, ZHTarArray     !< array with coordinates grid
 
       !> Variables for the MEP analysis
-      REAL, DIMENSION(:), ALLOCATABLE   :: XStart
-      REAL, DIMENSION(:), ALLOCATABLE   :: EigenFreq
-      REAL, DIMENSION(:,:), ALLOCATABLE :: EigenModes, Hessian
+      REAL, DIMENSION(:), ALLOCATABLE    :: XStart
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: LogMask
+      REAL, DIMENSION(:), ALLOCATABLE    :: EigenFreq
+      REAL, DIMENSION(:,:), ALLOCATABLE  :: EigenModes, Hessian
       REAL    :: EStart, E, GradNorm
 
       INTEGER :: i, j, k, nPoint, MaxStep
@@ -189,7 +190,7 @@ MODULE PotentialAnalysis
       PRINT "(/,A)",    " **** Starting geometry of the MEP ****"
 
       ! Allocate arrays for this section
-      ALLOCATE( XStart(NDim), Hessian(NDim, NDim), EigenFreq(NDim), EigenModes(NDim,NDim) )
+      ALLOCATE( XStart(NDim), Hessian(NDim, NDim), EigenFreq(NDim), EigenModes(NDim,NDim), LogMask(NDim) )
 
       ! guess reasonable coordinates of the minimum of the PES
       X(1) = 10.0/MyConsts_Bohr2Ang
@@ -197,7 +198,8 @@ MODULE PotentialAnalysis
       X(3) = 0.35/MyConsts_Bohr2Ang
 
       ! Find minimum by Newton's optimization
-      XStart = NewtonLocator( X, MaxOptSteps, OptThreshold, OptThreshold, (/ .FALSE., .TRUE., .TRUE. /) )
+      LogMask(:) = (/ .FALSE., .TRUE., .TRUE. /)
+      XStart = NewtonLocator( X, MaxOptSteps, OptThreshold, OptThreshold, LogMask )
       ! Computing the energy at this geometry
       EStart = GetPotAndForces( XStart, A )
 
@@ -272,7 +274,7 @@ MODULE PotentialAnalysis
       701 FORMAT ( "#---------------------------------------------------------------------------------" )
 
       ! Deallocate memory
-      DEALLOCATE( XStart, Hessian, EigenFreq, EigenModes )
+      DEALLOCATE( XStart, Hessian, EigenFreq, EigenModes, LogMask )
 
    END SUBROUTINE PotentialAnalysis_Run
 

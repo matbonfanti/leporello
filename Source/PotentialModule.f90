@@ -224,6 +224,7 @@ MODULE PotentialModule
          ! Check the number of degree of freedom
          CALL ERROR( size(AtPoint) /= NDim, "PotentialModule.GetSecondDerivatives: input array dimension mismatch" )
 
+         SecDeriv(:,:) = 0.0
          DO i = 1, NDim
             DO k = 1, size(Deltas)
 
@@ -465,7 +466,7 @@ MODULE PotentialModule
          CurrentX = StartX
     
 #if defined(LOG_FILE)
-         WRITE(__LOG_UNIT,"(A12,A20,A20)") " NewtonLocator | N Iteration", "Displacement Norm", "Gradient Norm"
+         WRITE(__LOG_UNIT,"(A28,A20,A20)") " NewtonLocator | N Iteration", "Displacement Norm", "Gradient Norm"
          WRITE(__LOG_UNIT,*)               " NewtonLocator |-------------------------------------------------------------"
 #endif
 
