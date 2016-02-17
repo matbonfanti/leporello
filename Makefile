@@ -429,8 +429,8 @@ ${OBJDIR}/vhsticking.o : ${SRCDIR}/vhsticking.f90
 COMMONDEP = Makefile ${OBJDIR}/ErrorTrap.o  ${OBJDIR}/MyConsts.o ${OBJDIR}/MyLinearAlgebra.o  ${SRCDIR}/preprocessoptions.cpp
 
 # Program to simulate the vibrational relaxation
-#${OBJDIR}/VibrationalRelax.o : ${SRCDIR}/VibrationalRelax.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                        \
-#                                ${OBJDIR}/UnitConversion.o ${OBJDIR}/ClassicalEqMotion.o ${OBJDIR}/PotentialModule.o                \
+#${OBJDIR}/VibrationalRelax.o : ${SRCDIR}/VibrationalRelax.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                       \
+#                                ${OBJDIR}/UnitConversion.o ${OBJDIR}/ClassicalEqMotion.o ${OBJDIR}/PotentialModule.o              \
 #                                ${OBJDIR}/IndependentOscillatorsModel.o ${OBJDIR}/RandomNumberGenerator.o ${COMMONDEP}
 
 # Program to simulate the thermal equilibrium dynamics
@@ -439,36 +439,37 @@ COMMONDEP = Makefile ${OBJDIR}/ErrorTrap.o  ${OBJDIR}/MyConsts.o ${OBJDIR}/MyLin
 #                                  ${OBJDIR}/RandomNumberGenerator.o ${COMMONDEP}
 
 # Program to simulate the scattering process
-#${OBJDIR}/ScatteringSimulation.o : ${SRCDIR}/ScatteringSimulation.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                \
-#                                    ${OBJDIR}/UnitConversion.o ${OBJDIR}/ClassicalEqMotion.o ${OBJDIR}/PotentialModule.o            \
-#                                    ${OBJDIR}/IndependentOscillatorsModel.o ${OBJDIR}/RandomNumberGenerator.o                       \
+#${OBJDIR}/ScatteringSimulation.o : ${SRCDIR}/ScatteringSimulation.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o               \
+#                                    ${OBJDIR}/UnitConversion.o ${OBJDIR}/ClassicalEqMotion.o ${OBJDIR}/PotentialModule.o          \
+#                                    ${OBJDIR}/IndependentOscillatorsModel.o ${OBJDIR}/RandomNumberGenerator.o                     \
 #                                    ${OBJDIR}/PrintTools.o ${OBJDIR}/SplineInterpolator.o ${COMMONDEP} 
 
 # Program to simulate the vibrational relaxation
-#${OBJDIR}/Harmonic1DModel.o : ${SRCDIR}/Harmonic1DModel.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                          \
-#                               ${OBJDIR}/ClassicalEqMotion.o ${OBJDIR}/IndependentOscillatorsModel.o                                \
+#${OBJDIR}/Harmonic1DModel.o : ${SRCDIR}/Harmonic1DModel.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                         \
+#                               ${OBJDIR}/ClassicalEqMotion.o ${OBJDIR}/IndependentOscillatorsModel.o                              \
 #                               ${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/UnitConversion.o ${OBJDIR}/FFTWrapper.o ${COMMONDEP}
 
 # Program to compute the properties of the PES
-${OBJDIR}/PotentialAnalysis.o : ${SRCDIR}/PotentialAnalysis.f90  ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                    \
-				${OBJDIR}/UnitConversion.o ${OBJDIR}/PotentialModule.o                                            \
+${OBJDIR}/PotentialAnalysis.o : ${SRCDIR}/PotentialAnalysis.f90  ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                     \
+				${OBJDIR}/UnitConversion.o ${OBJDIR}/PotentialModule.o                                             \
 				${OBJDIR}/PrintTools.o  ${COMMONDEP}
 
 # Program to compute the minimum energy path of the PES
-#${OBJDIR}/MinimumEnergyPath.o : ${SRCDIR}/MinimumEnergyPath.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                      \
-#                                 ${OBJDIR}/UnitConversion.o ${OBJDIR}/PotentialModule.o ${OBJDIR}/IndependentOscillatorsModel.o     \
+#${OBJDIR}/MinimumEnergyPath.o : ${SRCDIR}/MinimumEnergyPath.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                     \
+#                                 ${OBJDIR}/UnitConversion.o ${OBJDIR}/PotentialModule.o ${OBJDIR}/IndependentOscillatorsModel.o   \
 # 				${OBJDIR}/PrintTools.o ${COMMONDEP}
 
 # Module containing the definitions of the independent oscillator model
 ${OBJDIR}/IndependentOscillatorsModel.o  : ${SRCDIR}/IndependentOscillatorsModel.f90 ${OBJDIR}/SplineInterpolator.o                \
-				   ${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/FFTWrapper.o ${COMMONDEP}
+				   ${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/UnitConversion.o ${OBJDIR}/FFTWrapper.o ${COMMONDEP}
 
 # Module containing the integrator for the classical eq of motion
-#${OBJDIR}/ClassicalEqMotion.o  : ${SRCDIR}/ClassicalEqMotion.f90 ${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/FFTWrapper.o          \
+#${OBJDIR}/ClassicalEqMotion.o  : ${SRCDIR}/ClassicalEqMotion.f90 ${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/FFTWrapper.o         \
 #  					${COMMONDEP}
 
 # Module containing the potential energy surface
-${OBJDIR}/PotentialModule.o  : ${SRCDIR}/PotentialModule.f90 ${OBJDIR}/vEleyRideal_3D.o ${OBJDIR}/vhsticking.o ${COMMONDEP}
+${OBJDIR}/PotentialModule.o  : ${SRCDIR}/PotentialModule.f90 ${OBJDIR}/vEleyRideal_3D.o ${OBJDIR}/vhsticking.o                     \
+					${OBJDIR}/RandomNumberGenerator.o ${COMMONDEP}
 
 # Module containing the common data (v3)
 ${OBJDIR}/SharedData.o : ${SRCDIR}/SharedData.f90 ${OBJDIR}/IndependentOscillatorsModel.o ${COMMONDEP}

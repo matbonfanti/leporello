@@ -26,6 +26,8 @@
 
 MODULE PotentialModule
 #include "preprocessoptions.cpp"
+   USE RandomNumberGenerator
+   USE UnitConversion
 
    PRIVATE
    PUBLIC :: SetupPotential                       !< setup subroutine
@@ -43,6 +45,11 @@ MODULE PotentialModule
    !> Labels of the potential coordinates
    CHARACTER(5), DIMENSION(:), ALLOCATABLE, SAVE :: CoordLabels
 
+   !> Number of random generated points for the derivative testing
+   INTEGER, PARAMETER :: NPointsTest = 10.**4
+   !> Step for computing the numerical derivatives with finite differences
+   REAL, PARAMETER :: SmallDelta = 1.E-04
+
    CONTAINS
 
 !===============================================================================================================================
@@ -50,11 +57,16 @@ MODULE PotentialModule
 !**************************************************************************************
 !> Setup subroutine for the system potential. 
 !> Currently nothing needs to be set, but the subroutine is included for 
-!> future developments.
+!> future developments. The input optional variable DerivTest triggers the 
+!> testing procedure for the derivatives of the potential. Note that the subroutine 
+!> terminates the program after the test!
 !>
+!> @param DerivTest     Logical optional variable to set the derivative test
 !**************************************************************************************
-      SUBROUTINE SetupPotential(  )
+      SUBROUTINE SetupPotential( DerivTest )
          IMPLICIT NONE
+         LOGICAL, INTENT(IN), OPTIONAL :: DerivTest
+         REAL, DIMENSION(:), ALLOCATABLE :: CoordMin, CoordMax         !< Coordinate intervals where to check the derivatives
 
          ! exit if module is setup
          IF ( PotentialModuleIsSetup ) RETURN
@@ -78,7 +90,28 @@ MODULE PotentialModule
       __CLOSE_LOG_FILE
 #endif
 
-      END SUBROUTINE
+         ! Tests on the computation of the forces
+         IF ( PRESENT(DerivTest) ) THEN
+            IF ( DerivTest ) THEN
+
+               ! Set the intervals where to evaluate the derivatives
+               ALLOCATE( CoordMin(NDim), CoordMax(NDim) )
+               CoordMin(1) = 1.0/MyConsts_Bohr2Ang ; CoordMax(1) = 6.0/MyConsts_Bohr2Ang
+               CoordMin(2) = 0.5/MyConsts_Bohr2Ang ; CoordMax(2) = 3.0/MyConsts_Bohr2Ang
+               CoordMin(3) = -1.0/MyConsts_Bohr2Ang ; CoordMax(3) = 1.0/MyConsts_Bohr2Ang
+
+               ! Call the test subroutine
+               CALL TestForces( CoordMin, CoordMax )
+
+               ! Deallocate memory
+               DEALLOCATE( CoordMin, CoordMax )
+               ! Terminate the program
+               CALL AbortWithError( " Terminating the program after derivatives tests " )
+
+            END IF
+         END IF
+
+      END SUBROUTINE SetupPotential
 
 !===============================================================================================================================
 
@@ -546,6 +579,110 @@ MODULE PotentialModule
 
       END FUNCTION NewtonLocator
 
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Subrotine to test the computation of the forces by comparing
+!> analytically and numerically (finite difference) derivatives
+!> Points are sampled randomly (uniform distribution) in the interval 
+!> between the values defined by CoordMin and CoordMax
+!>
+!> @param CoordMin    Array with the NDim min values of the coordinates
+!> @param CoordMax    Array with the NDim max values of the coordinates
+!**************************************************************************************
+      SUBROUTINE TestForces( CoordMin, CoordMax ) 
+         IMPLICIT NONE
+         REAL, DIMENSION(:), INTENT(IN) :: CoordMin, CoordMax
+
+         REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
+         REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /) 
+
+         TYPE(RNGInternalState) :: Random
+
+         REAL, DIMENSION(:), ALLOCATABLE  :: AtPoint, Coordinates, AnalyticalDerivs, NumericalDerivs
+         REAL, DIMENSION(:), ALLOCATABLE  :: Average, Deviation
+
+         REAL    :: V
+         INTEGER :: iPnt, iCoord, iDispl
+         CHARACTER(16) :: ForceUnit
+
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.TestForces : Module not Setup" )
+         ! Check the number of degree of freedom
+         CALL ERROR( size(CoordMin) /= NDim, "PotentialModule.TestForces: array dimension mismatch" )
+         CALL ERROR( size(CoordMax) /= NDim, "PotentialModule.TestForces: array dimension mismatch" )
+
+         ! Allocate memory
+         ALLOCATE( Coordinates(NDim), AtPoint(NDim), AnalyticalDerivs(NDim), NumericalDerivs(NDim) )
+         ALLOCATE( Average(NDim), Deviation(NDim) )
+
+         ! Initialize random number generator
+         CALL SetSeed( Random, -512 )
+
+         DO iPnt = 1, NPointsTest
+            
+            ! generate random numbers for the coordinates
+            DO iCoord = 1, NDim 
+               AtPoint(iCoord) = CoordMin(iCoord) + (CoordMax(iCoord) - CoordMin(iCoord)) * UniformRandomNr(Random)
+            END DO
+
+            ! Compute analytical derivatives
+            V = GetPotAndForces( AtPoint, AnalyticalDerivs )
+
+            ! Compute numerical derivatives
+            NumericalDerivs(:) = 0.0
+            DO iCoord = 1, NDim 
+               DO iDispl = 1, size(Deltas)
+                  ! Define small displacement from the point where compute the derivative
+                  Coordinates(:) = AtPoint(:)
+                  Coordinates(iCoord) = Coordinates(iCoord) + Deltas(iDispl)*SmallDelta
+                  ! Compute potential in the displaced coordinate
+                  V = GetPotential( Coordinates )
+                  ! Increment numerical derivative
+                  NumericalDerivs(iCoord) = NumericalDerivs(iCoord) + Coeffs(iDispl)*V/SmallDelta
+               END DO
+            END DO
+
+            ! Accumulate to compute average and root mean squared deviations
+            Average = Average + ( NumericalDerivs - AnalyticalDerivs )
+            Deviation = Deviation + ( NumericalDerivs - AnalyticalDerivs )**2
+
+         END DO
+
+         ! Normalize averages
+         Average = Average / NPointsTest
+         Deviation = SQRT(Deviation / NPointsTest)
+
+         ! Print results to screen
+         PRINT "(2/,A)",    " ***************************************************"
+         PRINT "(A,F10.5)", "           TESTING POTENTIAL DERIVATIVES"
+         PRINT "(A,/)" ,    " ***************************************************"
+
+         WRITE(*,300) NPointsTest
+            
+         ForceUnit = TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits))
+         DO iCoord = 1, NDim 
+            WRITE(*,301) GetXLabel(iCoord), &
+                         CoordMin(iCoord)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits), &
+                         CoordMax(iCoord)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits), &
+                         Average(iCoord)*ForceConversion(InternalUnits,InputUnits), ForceUnit,                &
+                         Deviation(iCoord)*ForceConversion(InternalUnits,InputUnits), ForceUnit
+         END DO
+
+         300 FORMAT(" * Number of points where dV's are evaluated:   ",I10,  2/)
+         301 FORMAT(" * Coordinate ",A,/,&
+                    "      min for the sampling:                     "F10.4,1X,A,/,& 
+                    "      max for the sampling:                     "F10.4,1X,A,/,& 
+                    "      average deviation:                        "F10.4,1X,A,/,& 
+                    "      RMS deviation:                            "F10.4,1X,A,2/ )
+
+
+         ! Deallocate memory
+         DEALLOCATE( Coordinates, AtPoint, AnalyticalDerivs, NumericalDerivs )
+         DEALLOCATE( Average, Deviation )
+
+      END SUBROUTINE TestForces
+      
 !===============================================================================================================================
 
 END MODULE PotentialModule
