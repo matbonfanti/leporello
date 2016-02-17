@@ -1,108 +1,13 @@
 
-   ! ************************************************************************************************
-   !                  Potential of the Carbon Atom with H in asymptotic geometry
-   ! ************************************************************************************************
-
-   SUBROUTINE hstick_carbon( rcz, vv ) 
-      IMPLICIT NONE
-      REAL*8  rcz, vv
-
-      LOGICAL, DIMENSION(124) :: OptMask
-      REAL*8, DIMENSION(124) :: Dummy
-      REAL*8, DIMENSION(124), SAVE :: OptCoord = -0.01
-      REAL*8 :: EAsymptote = 1.D+100
-
-      INTEGER :: iCoord
-
-      INTERFACE
-         REAL*8 FUNCTION FullPotential( Positions, Forces )
-            REAL*8, DIMENSION(124) :: Positions
-            REAL*8, DIMENSION(124) :: Forces
-         END FUNCTION
-      END INTERFACE
-
-      INTERFACE
-         FUNCTION MinimizePotential( StartX, NMaxIter, GradThresh, Mask ) RESULT( MinPoint )
-            REAL*8, DIMENSION(:), INTENT(IN)    :: StartX
-            INTEGER, INTENT(IN)               :: NMaxIter
-            REAL*8, INTENT(IN)                  :: GradThresh
-            LOGICAL, DIMENSION(size(StartX)), INTENT(IN) :: Mask
-            REAL*8, DIMENSION(size(StartX))     :: MinPoint
-         END FUNCTION
-      END INTERFACE
-
-      IF ( EAsymptote > 100.D0 ) THEN
-         OptCoord = (/ 0.D0, 0.D0, 100.D0, 0.D0, 0.D0, 0.D0, 0.D0, (0.D0, iCoord=8,124) /)
-         EAsymptote = FullPotential( OptCoord, Dummy(:) ) 
-      END IF
-
-      ! Set optimization constraints
-      OptMask = (/ (.FALSE., iCoord=1,7), (.TRUE., iCoord=8,124) /)
-      ! Set starting geometry
-      OptCoord(1:7) = (/ 0.0D0, 0.0D0, 100.0D0, rcz, 0.D0, 0.D0, 0.D0 /)
-      ! Optimize coordinates
-      OptCoord =  MinimizePotential( OptCoord, 10**6, 1.0D-5, OptMask )
-
-      ! Use optimized coordinates to compute forces and energy
-      vv = FullPotential( OptCoord, Dummy(:) ) - EAsymptote
-
-   END SUBROUTINE hstick_carbon
 
    ! ************************************************************************************************
-   !                  Potential of the Hydrogen Atom with C fixed in Z = 0
+   !                  CH Potential 
    ! ************************************************************************************************
 
-   SUBROUTINE hstick_hydro( rhx, rhy, rhz, vv ) 
-      IMPLICIT NONE
-      REAL*8  rhx, rhy, rhz, vv
-
-      LOGICAL, DIMENSION(124) :: OptMask
-      REAL*8, DIMENSION(124) :: Dummy
-      REAL*8, DIMENSION(124), SAVE :: OptCoord = 0.0
-      INTEGER :: iCoord
-      REAL*8 :: EAsymptote = 1.D+100
-
-      INTERFACE
-         REAL*8 FUNCTION FullPotential( Positions, Forces )
-            REAL*8, DIMENSION(124) :: Positions
-            REAL*8, DIMENSION(124) :: Forces
-         END FUNCTION
-      END INTERFACE
-
-      INTERFACE
-         FUNCTION MinimizePotential( StartX, NMaxIter, GradThresh, Mask ) RESULT( MinPoint )
-            REAL*8, DIMENSION(:), INTENT(IN)    :: StartX
-            INTEGER, INTENT(IN)               :: NMaxIter
-            REAL*8, INTENT(IN)                  :: GradThresh
-            LOGICAL, DIMENSION(size(StartX)), INTENT(IN) :: Mask
-            REAL*8, DIMENSION(size(StartX))     :: MinPoint
-         END FUNCTION
-      END INTERFACE
-
-      IF ( EAsymptote > 100.D0 ) THEN
-         OptCoord = (/ 0.D0, 0.D0, 100.D0, 0.D0, 0.D0, 0.D0, 0.D0, (0.D0, iCoord=8,124) /)
-         EAsymptote = FullPotential( OptCoord, Dummy(:) ) 
-      END IF
-
-      ! Set optimization constraints
-      OptMask = (/ (.FALSE., iCoord=1,7), (.TRUE., iCoord=8,124) /)
-      ! Set starting geometry
-      OptCoord(1:7) = (/ rhx, rhy, rhz, 0.0D0, 0.D0, 0.D0, 0.D0 /)
-      ! Optimize coordinates
-      OptCoord =  MinimizePotential( OptCoord, 10**6, 1.0D-5, OptMask )
-
-      ! Use optimized coordinates to compute forces and energy
-      vv = FullPotential( OptCoord, Dummy(:) ) - EAsymptote
-
-   END SUBROUTINE hstick_hydro
-
-   ! ************************************************************************************************
-   !                  CH Coupling Potential 
-   ! ************************************************************************************************
-
-   SUBROUTINE hstick_coupling( rhx, rhy, rhz, rcz ,vv ) 
+   SUBROUTINE hstick( rhx, rhy, rhz, rcz ,vv, dv_rhx, dv_rhy, dv_rhz, dv_rcz ) 
       IMPLICIT NONE
       REAL*8  rhx, rhy, rhz, rcz, vv
+      REAL*8  dv_rhx, dv_rhy, dv_rhz, dv_rcz
 
       LOGICAL, DIMENSION(124) :: OptMask
       REAL*8, DIMENSION(124) :: Dummy
@@ -140,17 +45,14 @@
       ! Optimize coordinates
       OptCoord =  MinimizePotential( OptCoord, 10**6, 1.0D-5, OptMask )
 
-      ! Use optimized coordinates to compute forces and energy
+      ! Use optimized coordinates to compute derivatives and energy
       vv = FullPotential( OptCoord, Dummy(:) ) - EAsymptote
+      dv_rhx = -Dummy(1)
+      dv_rhy = -Dummy(2)
+      dv_rhz = -Dummy(3)
+      dv_rcz = -Dummy(4)
 
-      ! Compute H and C contributions
-      CALL hstick_hydro ( rhx, rhy, rhz, vh ) 
-      CALL hstick_carbon( rcz, vc ) 
-
-      ! Remove H and C contributions
-      vv = vv -vh -vc
-
-   END SUBROUTINE hstick_coupling
+   END SUBROUTINE hstick
 
    ! ************************************************************************************************
    !                                     OTHER SUBROUTINES

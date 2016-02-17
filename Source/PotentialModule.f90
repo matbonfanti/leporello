@@ -114,8 +114,8 @@ MODULE PotentialModule
 !**************************************************************************************
       REAL FUNCTION GetPotential( Positions ) RESULT(V) 
          IMPLICIT NONE
-
          REAL, DIMENSION(:), TARGET, INTENT(IN)  :: Positions
+         REAL, DIMENSION(SIZE(Positions))        :: Dummy
 
          INTERFACE
             SUBROUTINE ER_3D (zi, zt, zc, vv)
@@ -126,12 +126,11 @@ MODULE PotentialModule
 
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetPotential : Module not Setup" )
-
          ! Check the number of degree of freedom
          CALL ERROR( size(Positions) /= NDim, "PotentialModule.GetPotential: Positions array dimension mismatch" )
 
          ! Compute energy
-         CALL ER_3D( Positions(1), Positions(2), Positions(3), V )
+         CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Dummy(1), Dummy(2), Dummy(3) )
 
       END FUNCTION GetPotential
 
@@ -148,9 +147,8 @@ MODULE PotentialModule
 !**************************************************************************************
       REAL FUNCTION GetPotAndForces( Positions, Forces ) RESULT(V) 
          IMPLICIT NONE
-
-         REAL, DIMENSION(:), TARGET, INTENT(IN)  :: Positions
-         REAL, DIMENSION(:), TARGET, INTENT(OUT) :: Forces 
+         REAL, DIMENSION(:), TARGET, INTENT(IN)                :: Positions     
+         REAL, DIMENSION(SIZE(Positions)), TARGET, INTENT(OUT) :: Forces 
 
          INTERFACE
             SUBROUTINE ER_3D (zi, zt, zc, vv)
@@ -161,16 +159,11 @@ MODULE PotentialModule
 
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetPotAndForces : module not set" )
-
          ! Check the number of degree of freedom
-         CALL ERROR( size(Positions) /= NDim, "PotentialModule.GetPotAndForces: input array dimension mismatch (1)" )
-         CALL ERROR( size(Forces)    /= NDim, "PotentialModule.GetPotAndForces: input array dimension mismatch (2)" )
+         CALL ERROR( size(Positions) /= NDim, "PotentialModule.GetPotAndForces: input array dimension mismatch" )
 
          ! Compute energy
-         CALL ER_3D( Positions(1), Positions(2), Positions(3), V )
-
-         ! ERROR: FORCES ARE STILL MISSING
-         CALL ERROR( 1==1 , "PotentialModule.GetPotAndForces : forces are not implemented yet" )
+         CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Forces(1), Forces(2), Forces(3) )
 
       END FUNCTION GetPotAndForces
 
