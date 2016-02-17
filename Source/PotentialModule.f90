@@ -196,6 +196,7 @@ MODULE PotentialModule
 
          ! Compute energy
          CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Forces(1), Forces(2), Forces(3) )
+         Forces(:) = - Forces(:)
 
       END FUNCTION GetPotAndForces
 
