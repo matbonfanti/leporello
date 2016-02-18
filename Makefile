@@ -16,7 +16,7 @@ LOGNAME = leporello.log
 FC = ifort     
 
 # Debugging options ( yes or no )
-DEBUG =  no
+DEBUG =  no 
 
 # Optimization level
 OPTLEVEL = 3
@@ -487,7 +487,7 @@ ${OBJDIR}/UnitConversion.o : ${SRCDIR}/UnitConversion.f90 ${COMMONDEP}
 ${OBJDIR}/InputField.o : ${SRCDIR}/InputField.f90 ${COMMONDEP}
 
 # Wrapper for FFTW 3.3
-${OBJDIR}/FFTWrapper.o : ${SRCDIR}/FFTWrapper.f90 Makefile
+${OBJDIR}/FFTWrapper.o : ${SRCDIR}/FFTWrapper.f90 ${COMMONDEP}
 
 # Module containing the spline interpolation subroutines
 ${OBJDIR}/SplineInterpolator.o : ${SRCDIR}/SplineInterpolator.f90 ${OBJDIR}/NRUtility.o Makefile
