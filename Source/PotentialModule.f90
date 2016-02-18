@@ -31,7 +31,7 @@ MODULE PotentialModule
 
    PRIVATE
    PUBLIC :: SetupPotential                                        !< setup subroutine
-   PUBLIC :: GetXLabel                                             !< info subroutines
+   PUBLIC :: GetXLabel, GetSystemDimension                         !< info subroutines
    PUBLIC :: GetPotential, GetPotAndForces, GetSecondDerivatives   !< get potential and forces, and second derivatives
    PUBLIC :: SteepLocator, NewtonLocator          !< optimization and stationary points
 
@@ -126,13 +126,26 @@ MODULE PotentialModule
 
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetXLabel : Module not Setup" )
-         ! Potential module is set up
-         PotentialModuleIsSetup = .TRUE.
-
          CALL ERROR( iCoord > NDim .OR. iCoord < 1, "PotentialModule.GetXLabel : wrong coordinate number" )
          Label = CoordLabels(iCoord)
  
       END FUNCTION GetXLabel
+
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Function that returns the number of dimensions of the system.
+!>
+!> @returns   Nr of degrees of freedom on which the system potential depends
+!**************************************************************************************
+      INTEGER FUNCTION GetSystemDimension( )
+         IMPLICIT NONE
+
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetSystemDimension : Module not Setup" )
+         GetSystemDimension = 3
+ 
+      END FUNCTION GetSystemDimension
 
 !===============================================================================================================================
 

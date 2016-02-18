@@ -132,7 +132,7 @@ MODULE PotentialAnalysis
    SUBROUTINE PotentialAnalysis_Initialize()
       IMPLICIT NONE
 
-      NDim = 3
+      NDim = GetSystemDimension()
 
       ! Allocate memory and initialize vectors for positions, forces and masses
       ALLOCATE( X(NDim), A(NDim), MassVector(NDim) )
