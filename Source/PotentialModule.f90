@@ -467,7 +467,7 @@ MODULE PotentialModule
     
 #if defined(LOG_FILE)
          WRITE(__LOG_UNIT,"(A28,A20,A20)") " NewtonLocator | N Iteration", "Displacement Norm", "Gradient Norm"
-         WRITE(__LOG_UNIT,*)               " NewtonLocator |-------------------------------------------------------------"
+         WRITE(__LOG_UNIT,"(A)")           " NewtonLocator |-------------------------------------------------------------"
 #endif
 
          Iterations: DO NIter = 1, NMaxIter
