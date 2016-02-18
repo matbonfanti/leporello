@@ -45,9 +45,9 @@ MODULE PotentialAnalysis
    REAL :: OptThreshold    !< Convergence criterium for optimizations
 
    ! Parameters for Minimum Energy Path computation
-   INTEGER :: MaxMEPNrSteps  !< Max number of MEP steps
-   REAL    :: MEPStep        !< Size of each MEP step
-
+   INTEGER :: MaxMEPNrSteps    !< Max number of MEP steps
+   INTEGER :: PrintMEPNrSteps  !< Max number of MEP steps printed to file output
+   REAL    :: MEPStep          !< Size of each MEP step
 
       CONTAINS
 
@@ -89,7 +89,7 @@ MODULE PotentialAnalysis
       CALL SetFieldFromInput( InputData, "MaxMEPNrSteps", MaxMEPNrSteps, 1000 )
       CALL SetFieldFromInput( InputData, "MEPStep", MEPStep, 0.001 )
       MEPStep = MEPStep * LengthConversion(InputUnits, InternalUnits)
-
+      CALL SetFieldFromInput( InputData, "PrintMEPNrSteps", PrintMEPNrSteps, MaxMEPNrSteps )
       
       ! SCREEN LOG OF THE INPUT VARIABLES
       
@@ -103,7 +103,7 @@ MODULE PotentialAnalysis
       WRITE(*, 901) MaxOptSteps, OptThreshold*ForceConversion(InternalUnits,InputUnits), &
                     TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits))
                     
-      WRITE(*, 902) MEPStep*LengthConv, LengthUnit(InputUnits), MaxMEPNrSteps
+      WRITE(*, 902) MEPStep*LengthConv, LengthUnit(InputUnits), MaxMEPNrSteps, PrintMEPNrSteps
 
       900 FORMAT(" * Plot of a 3D cut of the potential in VTK format ",         /,&
                  " * Grid spacing :                                ",F10.4,1X,A,/,&
@@ -117,7 +117,8 @@ MODULE PotentialAnalysis
 
       902 FORMAT(" * Minimum energy path computation ",                         /,&
                  " * Length of the 4th order RK integration step:  ",F10.4,1X,A,/,&
-                 " * Max nr of integration steps:                  ",I10,       / )
+                 " * Max nr of integration steps:                  ",I10,       /,&
+                 " * Max nr of steps printed to output:            ",I10,       /)
       
    END SUBROUTINE PotentialAnalysis_ReadInput
 
@@ -158,9 +159,15 @@ MODULE PotentialAnalysis
       LOGICAL, DIMENSION(:), ALLOCATABLE :: LogMask
       REAL, DIMENSION(:), ALLOCATABLE    :: EigenFreq
       REAL, DIMENSION(:,:), ALLOCATABLE  :: EigenModes, Hessian
+      REAL, DIMENSION(:,:), ALLOCATABLE  :: StoreMEP
       REAL    :: EStart, E, GradNorm
+      INTEGER :: MEPFullUnit
 
-      INTEGER :: i, j, k, nPoint, MaxStep
+      !> Data for printing MEP in VTK format
+      TYPE(VTKInfo), SAVE :: MEPTraj
+
+      
+      INTEGER :: i, j, k, nPoint, MaxStep, NPrint
       LOGICAL :: Check
 
       PRINT "(2/,A)",    " ***************************************************"
@@ -222,7 +229,8 @@ MODULE PotentialAnalysis
 
       ! Allocate arrays for this section
       ALLOCATE( XStart(NDim), Hessian(NDim, NDim), EigenFreq(NDim), EigenModes(NDim,NDim), LogMask(NDim) )
-
+      ALLOCATE( StoreMEP(5,MaxMEPNrSteps+2) )
+      
       ! guess reasonable coordinates of the minimum of the PES
       X(1) = 10.0/MyConsts_Bohr2Ang
       X(2) = (0.35+1.1)/MyConsts_Bohr2Ang
@@ -269,6 +277,8 @@ MODULE PotentialAnalysis
       WRITE(*,601) -1., X(1)*LengthConversion(InternalUnits, InputUnits), &
          X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
          E*EnergyConversion(InternalUnits, InputUnits)
+      ! Store step in the data array
+      StoreMEP(:,1) = (/ -1., X(1:3), E /)
 
       ! First follow the incident direction until significant gradient is found
       DO i = 1, 1000
@@ -284,17 +294,26 @@ MODULE PotentialAnalysis
       WRITE(*,601) 0., X(1)*LengthConversion(InternalUnits, InputUnits), &
          X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
             E*EnergyConversion(InternalUnits, InputUnits)
+      ! Store step in the data array
+      StoreMEP(:,2) = (/ 0., X(1:3), E /)
 
+      NPrint = 2
       DO i = 2, MaxMEPNrSteps
          ! Following steps
          Check = FollowGradient( X, MEPStep )
+         E = GetPotential( X )
          IF ( .NOT. Check )  EXIT
          IF ( MOD(i,MaxMEPNrSteps/20) == 0 ) THEN
-             E = GetPotential( X )
              WRITE(*,601) i*MEPStep*LengthConversion(InternalUnits, InputUnits), X(2)*LengthConversion(InternalUnits, InputUnits), &
             X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
                E*EnergyConversion(InternalUnits, InputUnits)
          END IF
+         ! Store step in the data array (only for a number of steps equal to PrintMEPNrSteps )
+         IF ( MOD(i, MaxMEPNrSteps/PrintMEPNrSteps) == 0 ) THEN
+            NPrint = NPrint + 1
+            StoreMEP(:,NPrint) = (/ i*MEPStep, X(1:3), E /)
+         END IF
+
       END DO
       MaxStep = i - 1
 
@@ -305,7 +324,28 @@ MODULE PotentialAnalysis
             X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
                E*EnergyConversion(InternalUnits, InputUnits)
       WRITE(*,701)
+      ! Store final step in the data array 
+      NPrint = NPrint + 1
+      StoreMEP(:,NPrint) = (/ MaxStep*MEPStep, X(1:3), E /)
 
+
+      ! Open output file and write path to file
+      MEPFullUnit = LookForFreeUnit()
+      OPEN( FILE="MEP_Coord_Energy.dat", UNIT=MEPFullUnit )
+      ! Header of the output file
+      WRITE(MEPFullUnit,700) TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), TRIM(EnergyUnit(InputUnits))
+      ! Write minus section of the MEP
+      DO i = 1, NPrint
+         WRITE(MEPFullUnit,601) StoreMEP(1:4,i)*LengthConversion(InternalUnits, InputUnits), &
+                                StoreMEP(5,i)*EnergyConversion(InternalUnits, InputUnits)
+      END DO
+      ! Close file
+      CLOSE(MEPFullUnit)
+      
+      ! Write the MEP to VTV files
+      CALL VTK_WriteTrajectory ( MEPTraj, StoreMEP(2:4,1:NPrint)*LengthConversion(InternalUnits, InputUnits), "MEP_Trajectory" )
+
+      
       WRITE(*,"(/,A)") " * Last step reached... MEP written to file ________"
 
       501 FORMAT( " * ",A5,23X,1F15.6,1X,A )
@@ -316,8 +356,6 @@ MODULE PotentialAnalysis
                   "    mass-scaled coords of the normal mode / ",A," : ",4F12.6, / )
 
       601 FORMAT ( F12.4,F20.6,F20.6,F20.6,F20.6 )
-      602 FORMAT ( F20.6,F20.6,F20.6,F20.6 )
-
       700 FORMAT ( "#       Step", 10X, "    zH inc", 10X, "    zH tar", 10X, "        zC", 10X, "    Energy", /,  &
                    "#           ", A20              , A20              , A20              , A20              , /,  &
                    "#---------------------------------------------------------------------------------------------" )
@@ -325,6 +363,7 @@ MODULE PotentialAnalysis
 
       ! Deallocate memory
       DEALLOCATE( XStart, Hessian, EigenFreq, EigenModes, LogMask )
+      DEALLOCATE( StoreMEP )
 
    END SUBROUTINE PotentialAnalysis_Run
 
