@@ -48,6 +48,13 @@ Plot_ZHTarMax : 0.0
 Plot_ZCMin    : -0.5
 Plot_ZCMax    : -0.5
 
+# Stationary states optimization: max nr of steps, threshold of the iterative Newton search
+MaxOptSteps : 1000000
+OptThreshold : 1.E-03
+# Minimum energy path: length of the step along the gradient, max nr of steps
+MEPStep : 0.002
+MaxMEPNrSteps : 500000
+
 # Masses
 # mass of the target and incident H atom 
 MassHTar  : 1.00782503207
