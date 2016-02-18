@@ -32,7 +32,6 @@ MODULE ScatteringSimulation
    USE IndependentOscillatorsModel
    USE RandomNumberGenerator
 !    USE PrintTools
-!    USE SplineInterpolator
 
    IMPLICIT NONE
 
@@ -58,26 +57,27 @@ MODULE ScatteringSimulation
    REAL    :: TimeStep                  !< Time step for the integration of the classical EOM
    INTEGER :: NrOfPrintSteps            !< Nr of analysis steps
    INTEGER :: PrintStepInterval         !< Nr of tsteps between each print of propag info (=NrOfSteps/NrOfPrintSteps)
-! 
-!    ! Time evolution dataset
-!    TYPE(Evolution),SAVE :: MolecularDynamics     !< Propagate in micro/macrocanonical ensamble to extract results
-!    TYPE(Evolution),SAVE :: Equilibration         !< Propagate in macrocanonical ensamble at given T to generate init conditions
-! 
+
+   ! Dimensions of the problem
+   INTEGER :: NDim                      !< integer nr of dofs of the system+bath hamiltonian
+   INTEGER :: NSys                      !< integer nr of dofs of the system only
+   
+   ! Time evolution dataset
+   TYPE(Evolution),SAVE :: MolecularDynamics     !< Propagate in micro/macrocanonical ensamble to extract results
+   TYPE(Evolution),SAVE :: Equilibration         !< Propagate in macrocanonical ensamble at given T to generate init conditions
+
 !    ! Averages computed during propagation
 !    REAL, DIMENSION(:), ALLOCATABLE      :: AverageZHydro      !< Average position of zH vs time
 !    REAL, DIMENSION(:), ALLOCATABLE      :: AverageVHydro      !< Average velocity of zH vs time
 !    REAL, DIMENSION(:), ALLOCATABLE      :: AverageZCarbon     !< Average position of zC vs time
 !    REAL, DIMENSION(:), ALLOCATABLE      :: AverageVCarbon     !< Average velocity of zC vs time
 !    REAL, DIMENSION(:,:), ALLOCATABLE    :: TrappingProb       !< trapping prob vs time and impact parameter
-! 
-!    ! Random number generator internal status
-!    TYPE(RNGInternalState), SAVE :: RandomNr    !< spectial type dat to store internal status of random nr generator
-! 
+
+   ! Random number generator internal status
+   TYPE(RNGInternalState), SAVE :: RandomNr    !< spectial type dat to store internal status of random nr generator
+
 !    ! VTK file format
 !    TYPE(VTKInfo), SAVE :: TrappingFile         !< derived datatype to print trapping probability
-! 
-!    ! Number of dimensions of the system+bath hamiltonian
-!    INTEGER :: NDim                             !< integer nr of dofs of the system+bath hamiltonian
 
    CONTAINS
 
@@ -198,74 +198,55 @@ MODULE ScatteringSimulation
 !**************************************************************************************
    SUBROUTINE Scattering_Initialize()
       IMPLICIT NONE
-!       LOGICAL, DIMENSION(:), ALLOCATABLE :: LangevinSwitchOn
-!       INTEGER :: ZCEqUnit
-!       INTEGER :: iCoord, iData, NData
-!       REAL, DIMENSION(:), ALLOCATABLE :: ZHGrid, ZCValue
-! 
-!       ! Allocate memory and initialize vectors for trajectory, acceleration and masses
-! 
-!       IF ( BathType ==  SLAB_POTENTIAL ) THEN
-!          ALLOCATE( X(3+NCarbon), V(3+NCarbon), A(3+NCarbon), MassVector(3+NCarbon), LangevinSwitchOn(3+NCarbon) )
-!          MassVector = (/ (MassH, iCoord=1,3), (MassC, iCoord=1,NCarbon) /)
-! 
-!       ELSE IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
-!          ALLOCATE( X(4+NBath), V(4+NBath), A(4+NBath), MassVector(4+NBath), LangevinSwitchOn(4+NBath) )
-!          MassVector = (/ (MassH, iCoord=1,3), MassC, (MassBath, iCoord=1,NBath) /)
-! 
-!       ELSE IF ( BathType ==  DOUBLE_CHAIN ) THEN
-!          ALLOCATE( X(4+2*NBath), V(4+2*NBath), A(4+2*NBath), MassVector(4+2*NBath), LangevinSwitchOn(4+2*NBath) )
-!          MassVector = (/ (MassH, iCoord=1,3), MassC, (MassBath, iCoord=1,2*NBath) /)
-! 
-!       ELSE IF ( BathType == LANGEVIN_DYN ) THEN
-!          ALLOCATE( X(4), V(4), A(4), MassVector(4), LangevinSwitchOn(4) )
-!          MassVector = (/ (MassH, iCoord=1,3), MassC /)
-!       END IF
-! 
-!       ! store the nr of dimensions
-!       NDim = size(X)
-! 
-!       ! Set variables for EOM integration in the microcanonical ensamble (system + bath)
-!       CALL EvolutionSetup( MolecularDynamics, NDim, MassVector, TimeStep )
-! 
-!       ! Set canonical dynamics at the borders of the carbon slab
-!       IF ( BathType == SLAB_POTENTIAL .AND. DynamicsGamma /= 0.0 ) THEN 
-!          LangevinSwitchOn = .TRUE.
-!          LangevinSwitchOn( 1: MIN( 73, NCarbon )+3 ) = .FALSE.
-!          CALL SetupThermostat( MolecularDynamics, DynamicsGamma, Temperature, LangevinSwitchOn )
-!       END IF
-! 
-!       ! Set canonical dynamics at the end of the oscillator chain or chains
-!       IF ( BathType == CHAIN_BATH .AND. DynamicsGamma /= 0.0 ) THEN 
-!          LangevinSwitchOn = .FALSE.
-!          LangevinSwitchOn( NDim ) = .TRUE.
-!          CALL SetupThermostat( MolecularDynamics, DynamicsGamma, Temperature, LangevinSwitchOn )
-!       END IF
-!       IF ( BathType == DOUBLE_CHAIN .AND. DynamicsGamma /= 0.0 ) THEN 
-!          LangevinSwitchOn = .FALSE.
-!          LangevinSwitchOn( 4+NBath ) = .TRUE.  ! end of the first chain
-!          LangevinSwitchOn( NDim )    = .TRUE.  ! end of the second chain
-!          CALL SetupThermostat( MolecularDynamics, DynamicsGamma, Temperature, LangevinSwitchOn )
-!       END IF
-! 
-!       ! In case of Langevin relaxation, switch on gamma at the carbon atom
-!       IF ( BathType == LANGEVIN_DYN .AND. DynamicsGamma /= 0.0 ) THEN
-!          LangevinSwitchOn = (/ .FALSE. , .FALSE. , .FALSE. , .TRUE. /)
-!          CALL SetupThermostat( MolecularDynamics, DynamicsGamma, Temperature, LangevinSwitchOn )
-!       END IF
-! 
-!       ! Set variables for EOM integration with Langevin thermostat, during initial equilibration
-!       CALL EvolutionSetup( Equilibration, NDim, MassVector, EquilTStep )
-!       LangevinSwitchOn = (/ (.FALSE., iCoord=1,3), (.TRUE., iCoord=4,NDim ) /)
-!       CALL SetupThermostat( Equilibration, EquilGamma, Temperature, LangevinSwitchOn )
-! 
-!       DEALLOCATE( LangevinSwitchOn )
-! 
-!       ! Initialize random number seed
-!       CALL SetSeed( RandomNr, -1 )
-! 
-!       ! ALLOCATE AND INITIALIZE DATA WITH THE AVERAGES OVER THE SET OF TRAJECTORIES
-! 
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: LangevinSwitchOn
+      INTEGER :: iCoord
+
+      ! Define the relevant problem dimensions
+      NSys = GetSystemDimension()
+      IF ( BathType == LANGEVIN_DYN ) THEN
+         NDim = NSys
+      ELSE IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
+         NDim = NSys + NBath
+      END IF
+
+      ! Allocate memory and initialize vectors for trajectory, acceleration and masses
+      ALLOCATE( X(NDim), V(NDim), A(NDim), MassVector(NDim), LangevinSwitchOn(NDim) )
+
+      ! Define vector of the masses
+      IF ( BathType == LANGEVIN_DYN ) THEN
+         MassVector = (/ MassHInc, MassHTar, MassC /)
+      ELSE IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
+         MassVector = (/ MassHInc, MassHTar, MassC, (MassBath, iCoord=1,NBath) /)
+      END IF
+
+      ! Set variables for EOM integration in the microcanonical ensamble (system + bath)
+      CALL EvolutionSetup( MolecularDynamics, NDim, MassVector, TimeStep )
+
+      ! Set canonical dynamics at the end of the oscillator chain
+      IF ( BathType == CHAIN_BATH .AND. DynamicsGamma /= 0.0 ) THEN 
+         LangevinSwitchOn = .FALSE.
+         LangevinSwitchOn( NDim ) = .TRUE.
+         CALL SetupThermostat( MolecularDynamics, DynamicsGamma, Temperature, LangevinSwitchOn )
+      END IF
+
+      ! In case of Langevin relaxation, switch on gamma at the carbon atom
+      IF ( BathType == LANGEVIN_DYN .AND. DynamicsGamma /= 0.0 ) THEN
+         LangevinSwitchOn = (/ .FALSE. , .FALSE. , .TRUE. /)
+         CALL SetupThermostat( MolecularDynamics, DynamicsGamma, Temperature, LangevinSwitchOn )
+      END IF
+
+      ! Set variables for EOM integration with Langevin thermostat, during initial equilibration
+      CALL EvolutionSetup( Equilibration, NDim, MassVector, EquilTStep )
+      LangevinSwitchOn = (/ .FALSE., (.TRUE., iCoord=2,NDim ) /)
+      CALL SetupThermostat( Equilibration, EquilGamma, Temperature, LangevinSwitchOn )
+
+      DEALLOCATE( LangevinSwitchOn )
+
+      ! Initialize random number seed
+      CALL SetSeed( RandomNr, -1 )
+
+       ! ALLOCATE AND INITIALIZE DATA WITH THE AVERAGES OVER THE SET OF TRAJECTORIES
+
 !       ! Allocate and initialize the variables for the trajectory averages
 !       ALLOCATE( AverageVHydro(0:NrOfPrintSteps), AverageZHydro(0:NrOfPrintSteps) )
 !       ALLOCATE( AverageVCarbon(0:NrOfPrintSteps), AverageZCarbon(0:NrOfPrintSteps) )
@@ -279,34 +260,11 @@ MODULE ScatteringSimulation
 !          CALL ERROR( Collinear, " Scattering_Initialize: a non collinear potential is needed!" )
 !       END IF 
 ! 
-! #if defined(__ZH_DEPENDENT_COUPLING)
-!       ! Define spline function with ZCeq as a function of ZH
-!       IF ( BathType == NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
-! 
-!          ! Count available data and allocate memory
-!          NData = CountLinesInFile( TRIM(ADJUSTL(ZCofZHFile)) )
-!          ALLOCATE( ZHGrid(NData), ZCValue(NData) )
-! 
-!          ! open file and read content
-!          OPEN( FILE=TRIM(ADJUSTL(ZCofZHFile)) , UNIT= ZCEqUnit )
-!          DO iData = 1, NData
-!             READ(ZCEqUnit,*) ZHGrid(iData), ZCValue(iData)
-!          END DO 
-!          CLOSE( ZCEqUnit )
-! 
-!          ! Define spline interpolating function and deallocate memory
-!          CALL SetupSpline( ZCofZHSpline, ZHGrid, ZCValue )
-!          DEALLOCATE( ZHGrid, ZCValue )
-! 
+!       ! if XYZ files of the trajectories are required, allocate memory to store the traj
+!       IF ( PrintType >= FULL  .AND. ( RunType == SCATTERING .OR. RunType == EQUILIBRIUM ) ) THEN
+!            ALLOCATE( Trajectory( 16, ntime ) )
 !       END IF
-! #endif
-! 
-! !          ! if XYZ files of the trajectories are required, allocate memory to store the traj
-! !          IF ( PrintType >= FULL  .AND. ( RunType == SCATTERING .OR. RunType == EQUILIBRIUM ) ) THEN
-! !                ALLOCATE( Trajectory( 16, ntime ) )
-! !          END IF
-! ! 
-! 
+
    END SUBROUTINE Scattering_Initialize
 
 !===============================================================================================================================
@@ -749,15 +707,15 @@ MODULE ScatteringSimulation
 !**************************************************************************************
    SUBROUTINE Scattering_Dispose()
       IMPLICIT NONE
-! 
-!       ! Deallocate memory
-!       DEALLOCATE( X, V, A, MassVector )
+
+      ! Deallocate memory
+      DEALLOCATE( X, V, A, MassVector )
 !       DEALLOCATE( AverageVHydro, AverageZHydro, AverageVCarbon, AverageZCarbon, TrappingProb )
-! 
-!       ! Unset propagators 
-!       CALL DisposeEvolutionData( MolecularDynamics )
-!       CALL DisposeEvolutionData( Equilibration )
-! 
+
+      ! Unset propagators 
+      CALL DisposeEvolutionData( MolecularDynamics )
+      CALL DisposeEvolutionData( Equilibration )
+
    END SUBROUTINE Scattering_Dispose
 
 !===============================================================================================================================
