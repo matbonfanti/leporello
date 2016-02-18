@@ -251,6 +251,9 @@ endif
 
 PPDEFINE = 
 
+# Define macro for writing current version (git tag) in the code
+PPDEFINE += -DVERSIONTAG=\"$(shell git describe --tags)\"
+
 # Setup preprocessing debug options
 ifeq (${DEBUG}, yes)
    PPDEFINE += -DVERBOSE_OUTPUT

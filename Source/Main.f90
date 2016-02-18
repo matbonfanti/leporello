@@ -1,7 +1,7 @@
 !***************************************************************************************
 !*                              PROGRAM leporello
 !***************************************************************************************
-!>  \mainpage      Program leporello - version 1
+!>  \mainpage      Program leporello 
 !>
 !>  Classical simulations of H + H + C(graphene) + dissipative bath       \n
 !>  * Model: 1D for Hinc + 1D for Htar + 1D Z coordinate for carbon atom  \n
@@ -54,7 +54,9 @@ PROGRAM leporello
    PRINT "(/,     '                    ==============================')"
    PRINT "(       '                               leporello          ')"
    PRINT "(       '                    ==============================',/)"
-   PRINT "(       '                       Author: Matteo Bonfanti  ',/)"
+   PRINT "(       '                       Author: Matteo Bonfanti'      )"
+   PRINT "(       '                       Release: ',A)", VERSIONTAG
+   PRINT "(       '                       Compilation: ',A,1X,A,/)", __DATE__, __TIME__ 
 
    PRINT "(       '                       << Notte e giorno faticar      ')"
    PRINT "(       '                         per chi nulla sa gradir      ')"
