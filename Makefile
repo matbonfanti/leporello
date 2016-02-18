@@ -467,8 +467,8 @@ ${OBJDIR}/IndependentOscillatorsModel.o  : ${SRCDIR}/IndependentOscillatorsModel
 				   ${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/UnitConversion.o ${OBJDIR}/FFTWrapper.o ${COMMONDEP}
 
 # Module containing the integrator for the classical eq of motion
-#${OBJDIR}/ClassicalEqMotion.o  : ${SRCDIR}/ClassicalEqMotion.f90 ${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/FFTWrapper.o         \
-#  					${COMMONDEP}
+${OBJDIR}/ClassicalEqMotion.o  : ${SRCDIR}/ClassicalEqMotion.f90 ${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/FFTWrapper.o         \
+ 					${COMMONDEP}
 
 # Module containing the potential energy surface
 ${OBJDIR}/PotentialModule.o  : ${SRCDIR}/PotentialModule.f90 ${OBJDIR}/vEleyRideal_3D.o ${OBJDIR}/vhsticking.o                     \
