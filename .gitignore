@@ -30,3 +30,8 @@
 # Compiling directories
 Executables/*
 PreProcessed/*
+
+# documentation directories
+Documentation/html/
+Documentation/latex/
+
