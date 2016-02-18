@@ -62,6 +62,7 @@ MODULE PotentialAnalysis
    SUBROUTINE PotentialAnalysis_ReadInput( InputData )
       IMPLICIT NONE
       TYPE(InputFile), INTENT(INOUT) :: InputData
+      REAL :: LengthConv
 
       ! parameters for the plot 
       CALL SetFieldFromInput( InputData, "Plot_GridSpacing", GridSpacing )
@@ -82,12 +83,42 @@ MODULE PotentialAnalysis
       ! Set variables for minima and TS optimization
       CALL SetFieldFromInput( InputData, "MaxOptSteps", MaxOptSteps, 10**6 )
       CALL SetFieldFromInput( InputData, "OptThreshold", OptThreshold, 1.E-6 )
-
+      OptThreshold = OptThreshold * ForceConversion(InputUnits, InternalUnits)
+      
       ! Set variables for Minimum Energy Path computation
       CALL SetFieldFromInput( InputData, "MaxMEPNrSteps", MaxMEPNrSteps, 1000 )
       CALL SetFieldFromInput( InputData, "MEPStep", MEPStep, 0.001 )
       MEPStep = MEPStep * LengthConversion(InputUnits, InternalUnits)
 
+      
+      ! SCREEN LOG OF THE INPUT VARIABLES
+      
+      LengthConv = LengthConversion(InternalUnits,InputUnits)
+      
+      WRITE(*, 900) GridSpacing*LengthConv, LengthUnit(InputUnits), &
+                    GetXLabel(1), ZHIncMin*LengthConv, ZHIncMax*LengthConv, LengthUnit(InputUnits), &
+                    GetXLabel(2), ZHTarMin*LengthConv, ZHTarMax*LengthConv, LengthUnit(InputUnits), &
+                    GetXLabel(3), ZCMin*LengthConv, ZCMax*LengthConv, LengthUnit(InputUnits)
+
+      WRITE(*, 901) MaxOptSteps, OptThreshold*ForceConversion(InternalUnits,InputUnits), &
+                    TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits))
+                    
+      WRITE(*, 902) MEPStep*LengthConv, LengthUnit(InputUnits), MaxMEPNrSteps
+
+      900 FORMAT(" * Plot of a 3D cut of the potential in VTK format ",         /,&
+                 " * Grid spacing :                                ",F10.4,1X,A,/,&
+                 " * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A,/,&
+                 " * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A,/,&
+                 " * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A,/ )
+
+      901 FORMAT(" * Stationary states optimization with Newton's method ",     /,&
+                 " * Max nr of steps of the optimization:          ",I10,       /,&
+                 " * Threshold on the gradient:                    ",F10.4,1X,A,/)
+
+      902 FORMAT(" * Minimum energy path computation ",                         /,&
+                 " * Length of the 4th order RK integration step:  ",F10.4,1X,A,/,&
+                 " * Max nr of integration steps:                  ",I10,       / )
+      
    END SUBROUTINE PotentialAnalysis_ReadInput
 
 !===============================================================================================================================
@@ -199,7 +230,7 @@ MODULE PotentialAnalysis
 
       ! Find minimum by Newton's optimization
       LogMask(:) = (/ .FALSE., .TRUE., .TRUE. /)
-      XStart = NewtonLocator( X, MaxOptSteps, OptThreshold, OptThreshold, LogMask )
+      XStart = NewtonLocator( X, MaxOptSteps, OptThreshold, 1.0, LogMask )
       ! Computing the energy at this geometry
       EStart = GetPotAndForces( XStart, A )
 
@@ -226,15 +257,16 @@ MODULE PotentialAnalysis
          END IF
       END DO
 
-      PRINT "(/,A)",    " **** Minimum energy path ****"
+      PRINT "(/,A,/)",    " **** Minimum energy path ****"
+      WRITE(*,701)
 
       ! Write header lines screen 
-      WRITE(*,700) TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), TRIM(EnergyUnit(InputUnits))
+      WRITE(*,700) TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), TRIM(EnergyUnit(InputUnits))
 
       ! Start from XStart
       X(:) = XStart; E = GetPotential( X )
       ! Write to output file and to screen the starting point
-      WRITE(*,601) -1, X(1)*LengthConversion(InternalUnits, InputUnits), &
+      WRITE(*,601) -1., X(1)*LengthConversion(InternalUnits, InputUnits), &
          X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
          E*EnergyConversion(InternalUnits, InputUnits)
 
@@ -249,7 +281,7 @@ MODULE PotentialAnalysis
       END DO
 
       ! Write to output file and to screen the starting point
-      WRITE(*,601) 0, X(1)*LengthConversion(InternalUnits, InputUnits), &
+      WRITE(*,601) 0., X(1)*LengthConversion(InternalUnits, InputUnits), &
          X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
             E*EnergyConversion(InternalUnits, InputUnits)
 
@@ -259,7 +291,7 @@ MODULE PotentialAnalysis
          IF ( .NOT. Check )  EXIT
          IF ( MOD(i,MaxMEPNrSteps/20) == 0 ) THEN
              E = GetPotential( X )
-             WRITE(*,601) i, X(2)*LengthConversion(InternalUnits, InputUnits), &
+             WRITE(*,601) i*MEPStep*LengthConversion(InternalUnits, InputUnits), X(2)*LengthConversion(InternalUnits, InputUnits), &
             X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
                E*EnergyConversion(InternalUnits, InputUnits)
          END IF
@@ -267,27 +299,29 @@ MODULE PotentialAnalysis
       MaxStep = i - 1
 
       ! Write to screen final step
+      WRITE(*,701)
       E = GetPotential( X )
-      WRITE(*,601) MaxStep, X(1)*LengthConversion(InternalUnits, InputUnits), &
+      WRITE(*,601) MaxStep*MEPStep*LengthConversion(InternalUnits, InputUnits), X(1)*LengthConversion(InternalUnits, InputUnits), &
             X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
                E*EnergyConversion(InternalUnits, InputUnits)
+      WRITE(*,701)
 
       WRITE(*,"(/,A)") " * Last step reached... MEP written to file ________"
 
       501 FORMAT( " * ",A5,23X,1F15.6,1X,A )
-      502 FORMAT( " * Energy",22X,1F15.6,1X,A,/ )
+      502 FORMAT( " * Energy",22X,1F15.6,1X,A )
       503 FORMAT( " Normal Mode ",I5," - real frequency: ",1F15.2,1X,A, /, &
                   "    mass-scaled coords of the normal mode / ",A," : ",4F12.6, / )
       504 FORMAT( " Normal Mode ",I5," - imag frequency: ",1F15.2,1X,A, /, &
                   "    mass-scaled coords of the normal mode / ",A," : ",4F12.6, / )
 
-      600 FORMAT ( A12,A20,A20,A20 )
-      601 FORMAT ( I12,F20.6,F20.6,F20.6,F20.6 )
+      601 FORMAT ( F12.4,F20.6,F20.6,F20.6,F20.6 )
       602 FORMAT ( F20.6,F20.6,F20.6,F20.6 )
 
-      700 FORMAT ( "#  N Step   ", "   zH Coord / ", A6, "   zC Coord / ", A6, "     Energy / ", A6, /,  &
-                   "#---------------------------------------------------------------------------------" )
-      701 FORMAT ( "#---------------------------------------------------------------------------------" )
+      700 FORMAT ( "#       Step", 10X, "    zH inc", 10X, "    zH tar", 10X, "        zC", 10X, "    Energy", /,  &
+                   "#           ", A20              , A20              , A20              , A20              , /,  &
+                   "#---------------------------------------------------------------------------------------------" )
+      701 FORMAT ( "#---------------------------------------------------------------------------------------------" )
 
       ! Deallocate memory
       DEALLOCATE( XStart, Hessian, EigenFreq, EigenModes, LogMask )
