@@ -30,7 +30,7 @@ MODULE SharedData
    INTEGER :: RunType
    INTEGER, PARAMETER :: EQUILIBRIUM      = 1,  & ! Equilibrium calculation with H already adsorbed
                          RELAXATION       = 2,  & ! Relaxation dynamics of a CH bound state, with the bath at 0K
-                         SCATTERING       = 3,  & ! Scattering calculation with H coming from gas-phase
+                         SCATTERING       = 4,  & ! Scattering calculation with H coming from gas-phase
                          POTENTIAL        = 10    ! Static analysis of the potential 
 
    !> Variable to set the print level of the calculation

@@ -25,7 +25,7 @@ PROGRAM leporello
 !    USE MinimumEnergyPath
 !    USE VibrationalRelax
 !    USE ThermalEquilibrium
-!    USE ScatteringSimulation
+   USE ScatteringSimulation
    USE IndependentOscillatorsModel
    USE PotentialModule
 
@@ -206,8 +206,8 @@ PROGRAM leporello
 !          WRITE(*,"(/,A)") " * Atom-surface equilibrium simulation "
 !       CASE( RELAXATION )
 !          WRITE(*,"(/,A)") " * Atom-surface vibrational relaxation simulation "
-!       CASE( SCATTERING )
-!          WRITE(*,"(/,A)") " * Atom-surface sticking simulation "
+      CASE( SCATTERING )
+         WRITE(*,"(/,A)") " * Atom-surface sticking simulation "
       CASE( POTENTIAL )
          WRITE(*,"(/,A)") " * Analysis of the potential energy surfaces "
    END SELECT
@@ -343,8 +343,8 @@ PROGRAM leporello
 !          CALL ThermalEquilibrium_ReadInput( InputData )
 !       CASE( RELAXATION )
 !          CALL VibrationalRelax_ReadInput( InputData )
-!       CASE( SCATTERING )
-!          CALL Scattering_ReadInput( InputData )
+      CASE( SCATTERING )
+         CALL Scattering_ReadInput( InputData )
       CASE( POTENTIAL )
          CALL PotentialAnalysis_ReadInput( InputData )
    END SELECT
@@ -362,9 +362,9 @@ PROGRAM leporello
 !       CASE( RELAXATION )
 !          CALL VibrationalRelax_Initialize( )
 !          CALL VibrationalRelax_Run()
-!       CASE( SCATTERING )
-!          CALL Scattering_Initialize()
-!          CALL Scattering_Run()
+      CASE( SCATTERING )
+         CALL Scattering_Initialize()
+         CALL Scattering_Run()
       CASE( POTENTIAL )
          CALL PotentialAnalysis_Initialize()
          CALL PotentialAnalysis_Run()
@@ -379,8 +379,8 @@ PROGRAM leporello
 !          CALL ThermalEquilibrium_Dispose()
 !       CASE( RELAXATION )
 !          CALL VibrationalRelax_Dispose()
-!       CASE( SCATTERING )
-!          CALL Scattering_Dispose()
+      CASE( SCATTERING )
+         CALL Scattering_Dispose()
       CASE( POTENTIAL )
          CALL PotentialAnalysis_Dispose()
    END SELECT
