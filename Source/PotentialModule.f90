@@ -31,7 +31,7 @@ MODULE PotentialModule
 
    PRIVATE
    PUBLIC :: SetupPotential                                        !< setup subroutine
-   PUBLIC :: GetXLabel, GetSystemDimension                         !< info subroutines
+   PUBLIC :: GetXLabel, GetSystemDimension, PESIsCollinear         !< info subroutines
    PUBLIC :: GetPotential, GetPotAndForces, GetSecondDerivatives   !< get potential and forces, and second derivatives
    PUBLIC :: SteepLocator, NewtonLocator          !< optimization and stationary points
 
@@ -135,7 +135,6 @@ MODULE PotentialModule
 
 !**************************************************************************************
 !> Function that returns the number of dimensions of the system.
-!>
 !> @returns   Nr of degrees of freedom on which the system potential depends
 !**************************************************************************************
       INTEGER FUNCTION GetSystemDimension( )
@@ -146,6 +145,21 @@ MODULE PotentialModule
          GetSystemDimension = 3
  
       END FUNCTION GetSystemDimension
+
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Inquire whether the potential is collinear or not
+!> @returns   Logical value: .TRUE. for a collinear PES, .FALSE. otherwise
+!**************************************************************************************
+      LOGICAL FUNCTION PESIsCollinear( )
+         IMPLICIT NONE
+
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.PESIsCollinear : Module not Setup" )
+         PESIsCollinear = .TRUE.
+ 
+      END FUNCTION PESIsCollinear
 
 !===============================================================================================================================
 
