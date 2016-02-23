@@ -22,6 +22,8 @@
 !>  \par Updates
 !>  \arg N.A.
 !
+!>  \todo complete log output of subroutine StartSystemForScattering
+!
 !***************************************************************************************
 
 MODULE PotentialModule
@@ -33,8 +35,10 @@ MODULE PotentialModule
    PUBLIC :: SetupPotential                                        !< setup subroutine
    PUBLIC :: GetXLabel, GetSystemDimension, PESIsCollinear         !< info subroutines
    PUBLIC :: GetPotential, GetPotAndForces, GetSecondDerivatives   !< get potential and forces, and second derivatives
-   PUBLIC :: SteepLocator, NewtonLocator          !< optimization and stationary points
-
+   PUBLIC :: SteepLocator, NewtonLocator                           !< optimization and stationary points
+   PUBLIC :: StartSystemForScattering                              !< system initial conditions subroutines
+   PUBLIC :: GetNrChannels, GetChannelLabel, GetCurrentChannel     !< trajectory analysis
+   
    !> Setup variable for the potential
    LOGICAL, SAVE :: PotentialModuleIsSetup = .FALSE.
 
@@ -49,6 +53,9 @@ MODULE PotentialModule
    !> Step for computing the numerical derivatives with finite differences
    REAL, PARAMETER :: SmallDelta = 0.00001
 
+   ! Logical control variable for the log of subroutine StartSystemForScattering
+   LOGICAL, SAVE  :: LogScattInit = .TRUE.
+   
    CONTAINS
 
 !===============================================================================================================================
@@ -160,6 +167,77 @@ MODULE PotentialModule
          PESIsCollinear = .TRUE.
  
       END FUNCTION PESIsCollinear
+
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Function that returns the number of final channels in the trajectory analysis
+!> @returns   Nr of channels
+!**************************************************************************************
+      INTEGER FUNCTION GetNrChannels( )
+         IMPLICIT NONE
+
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetNrChannels : Module not Setup" )
+         GetNrChannels = 4
+ 
+      END FUNCTION GetNrChannels
+
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Function that returns a string describing the i-th channel, where i is the integer input
+!> @param ChannelIdNumber  ordinal number of the channel
+!> @returns                string describing the ChannelIdNumber-th channel
+!**************************************************************************************
+      CHARACTER(20) FUNCTION GetChannelLabel( ChannelIdNumber )
+         IMPLICIT NONE
+         INTEGER, INTENT(IN) :: ChannelIdNumber
+
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetChannelLabel : Module not Setup" )
+
+         SELECT CASE ( ChannelIdNumber )
+            CASE ( 0 )
+               GetChannelLabel = "interaction"
+            CASE ( 1 )
+               GetChannelLabel = "reflection"
+            CASE ( 2 )
+               GetChannelLabel = "reaction"
+            CASE ( 3 )
+               GetChannelLabel = "cid"
+            CASE DEFAULT
+               CALL AbortWithError( "PotentialModule.GetChannelLabel : channel ID does not exist" )
+         END SELECT
+ 
+      END FUNCTION GetChannelLabel
+
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Function that returns the current channel for the given coordinate values
+!> @param Position  given position
+!> @returns         current channel corresponding to Position
+!**************************************************************************************
+      INTEGER FUNCTION GetCurrentChannel( Position )
+         IMPLICIT NONE
+         REAL, DIMENSION(:), INTENT(IN) :: Position
+
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetCurrentChannel : Module not Setup" )
+         CALL ERROR( size(Position) > NDim .OR. size(Position) < 1, "PotentialModule.GetCurrentChannel : wrong coordinate number" )
+
+         IF ( Position(1) > 20. .AND. Position(2) < 5. ) THEN
+            GetCurrentChannel = 1         ! projectile is reflected to the gas phase, target still bound
+         ELSE IF ( Position(1) > 20. .AND. Position(2) > 20. .AND. abs(Position(1)-Position(2)) < 4.0 ) THEN
+            GetCurrentChannel = 2         ! projectile and target are reflected to the gas phase in a bound state
+         ELSE IF ( Position(1) > 20. .AND. Position(2) > 20. .AND. abs(Position(1)-Position(2)) > 4.0 ) THEN
+            GetCurrentChannel = 3         ! projectile and target are reflected to the gas phase, without being in a bound state
+         ELSE
+            GetCurrentChannel = 0
+         END IF
+ 
+      END FUNCTION GetCurrentChannel
 
 !===============================================================================================================================
 
@@ -329,6 +407,157 @@ MODULE PotentialModule
          END DO
          
       END FUNCTION ConstrainedVector
+
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Setup initial condition for the system, in the case of a scattering simulation.
+!> The initial state can be chosen to be either a finite temperature classical 
+!> state or a quasi-classical T=0 K state.
+!>
+!> @param X              Output vector with the initial positions of the system
+!> @param V              Output vector with the initial Velocities of the system
+!> @param M              Input vector with the masses of the system coordinates
+!> @param InitDist       Input real value of the scatterer distace
+!> @param InitEKin       Input real value of the scatterer kinetic energy
+!> @param ImpactPar      Input real value of the impact parameter
+!> @param Temperature    Input real value of the temperature
+!> @param RandomNr       Internal state of the random number generator
+!> @param Task           Integer flag to set the task to perform
+!**************************************************************************************
+      SUBROUTINE StartSystemForScattering( X, V, M, InitDist, InitEKin, ImpactPar, Temperature, RandomNr, Task )
+         IMPLICIT NONE
+         REAL, DIMENSION(:), INTENT(OUT)       :: X
+         REAL, DIMENSION(size(X)), INTENT(OUT) :: V
+         REAL, DIMENSION(size(X)), INTENT(IN)  :: M
+         REAL                                  :: InitDist, InitEKin, ImpactPar
+         REAL                                  :: Temperature
+         TYPE(RNGInternalState), INTENT(INOUT) :: RandomNr
+         INTEGER                               :: Task
+
+         INTEGER, PARAMETER   ::  EQUILIBRATION_CLASSICAL = 1
+         INTEGER, PARAMETER   ::  SCATTERING_CLASSICAL    = 2
+         INTEGER, PARAMETER   ::  QUASICLASSICAL          = 3
+         
+         REAL, DIMENSION(size(X),size(X)) ::  Hessian, NormalModesVec
+         REAL, DIMENSION(size(X))         ::  NormalModesVal
+         INTEGER :: i,j
+         REAL    :: Value, CarbonFreq, SigmaV
+
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.StartSystemForScattering : module not set" )
+         ! Check the number of degree of freedom
+         CALL ERROR( size(X) /= NDim, "PotentialModule.StartSystemForScattering: input array dimension mismatch" )
+
+         ! In case of a SCATTERING_CLASSICAL task, coordinates of the substrate are left untouched
+         IF ( Task == EQUILIBRATION_CLASSICAL .OR. Task ==  QUASICLASSICAL ) THEN
+         
+            ! SET INITIAL GEOMETRY, OPTIMIZING THE NON-SCATTERING COORDINATES
+            X(1) = 10.0000 / MyConsts_Bohr2Ang
+            X(2) = 1.45000 / MyConsts_Bohr2Ang
+            X(3) = 0.35000 / MyConsts_Bohr2Ang
+            X = NewtonLocator( X, 10**3, 1.E-6, 1.E-6 )
+            
+            ! COMPUTE HESSIAN, DIVIDE IT BY THE MASSES AND FIND NORMAL MODES
+            ! Use subroutine GetSecondDerivatives to compute the matrix of the 2nd derivatives
+            Hessian(:,:) = GetSecondDerivatives( X ) 
+            ! Numerical hessian of the potential in mass weighted coordinates
+            DO j = 1, NDim
+               DO i = 1, NDim
+                  Hessian(i,j) = Hessian(i,j) / SQRT( M(i)*M(j) )
+               END DO
+            END DO
+            ! Diagonalize
+            CALL TheOneWithDiagonalization(Hessian, NormalModesVec, NormalModesVal)
+
+            ! WEIGHT STARTING COORDS BY MASS AND TRANSFORM TO THE NORMAL MODES REFERENCE
+            DO i = 1, NDim
+               X(i) = X(i) * SQRT( M(i) )
+            END DO
+            X = TheOneWithMatrixVectorProduct( TheOneWithTransposeMatrix(NormalModesVec), X )
+
+            ! SET VELOCITIES AND MOMENTA OF BOUND COORDINATES
+
+            ! cycle over the coordinates
+            DO i = 1, NDim
+
+               ! Set sigma of the maxwell boltzmann distribution
+               SigmaV = sqrt( Temperature )
+
+               ! the coordinate is bound
+               IF ( NormalModesVal(i) > 0. ) THEN
+                  ! set frequency of the normal mode
+                  CarbonFreq = SQRT( NormalModesVal(i) )
+                  ! Classical distribution
+                  IF ( Task == EQUILIBRATION_CLASSICAL ) THEN
+                     X(i) = X(i) + GaussianRandomNr(RandomNr) * SigmaV / CarbonFreq
+                     V(i) = GaussianRandomNr(RandomNr) * SigmaV
+                  ! Quasiclassical distribution
+                  ELSE IF (  Task ==  QUASICLASSICAL ) THEN
+                     Value = UniformRandomNr( RandomNr )*2.0*MyConsts_PI
+                     X(i) = X(i) + COS(Value) / SQRT(CarbonFreq)
+                     V(i) = SIN(Value) * SQRT(CarbonFreq)
+                  END IF
+
+               ! unbound coordinate (set velocity according to maxwell-boltzman) 
+               ELSE
+                  X(i) = X(i)
+                  V(i) = GaussianRandomNr(RandomNr) * SigmaV
+
+               ENDIF
+            END DO
+               
+            ! TRASFORM BACK TO ORIGINAL FRAME AND TO NOT-MASS-WEIGHTED COORDINATES
+            X = TheOneWithMatrixVectorProduct( NormalModesVec, X )
+            V = TheOneWithMatrixVectorProduct( NormalModesVec, V )
+            DO i = 1, NDim
+               X(i) = X(i) / SQRT( M(i) )
+               V(i) = V(i) / SQRT( M(i) )
+            END DO
+
+         END IF 
+         
+         ! Set initial coord and vel of the scatterer
+         SELECT CASE ( Task )
+            CASE ( EQUILIBRATION_CLASSICAL )
+               X(1) = X(1)
+               V(1) = 0.0
+            CASE ( QUASICLASSICAL, SCATTERING_CLASSICAL )
+               X(1) = InitDist
+               V(1) = -SQRT( 2.0 * InitEKin / M(1) )
+            CASE DEFAULT
+               CALL AbortWithError( "PotentialModule.StartSystemForScattering : Task is not defined" )
+         END SELECT
+
+         IF ( LogScattInit ) THEN
+
+              ! PRINT INFO
+              ! system starts with random displacement around this minimum geometry and random momenta
+              ! computed in the frame of the normal modes
+              ! frequencies for the bound states are computed with a normal modes analysis at the minimum
+              ! here are the frequencies: 
+              ! i-th normal mode is a bound coordinate of frequency tot
+              ! j-th degree is a free coordinate of imaginary frequency tot
+              ! displacement and momenta along the normal modes follow a classical boltzmann distribution for a harmonic Oscillators
+              ! or a quasi-classical distribution for a harmonic oscillator at a classical orbit of energy
+              ! given by the ZPE hbar*omega
+              
+              ! -----------------------
+              
+!             DO i = 1, NDim
+!                IF ( NormalModesVal(i) > 0. ) THEN
+!                   PRINT*, SQRT(NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits)
+!                ELSE
+!                   PRINT*, SQRT(-NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits), " *i"
+!                ENDIF
+!             END DO
+
+              LogScattInit = .FALSE.
+              
+          END IF 
+
+      END SUBROUTINE StartSystemForScattering
+
 
 !===============================================================================================================================
 
