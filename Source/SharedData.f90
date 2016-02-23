@@ -65,7 +65,6 @@ MODULE SharedData
    REAL           :: BathLowerCutOffFreq       !< lower cutoff frequency of the bath
    CHARACTER(100) :: SpectralDensityFile       !< spectral density file name
    TYPE(BathData), SAVE :: Bath                      !< derived datatype to define a single bath
-   LOGICAL        :: ZPECorrection             !< ZeroPointEnergy correction in the initial conditions of the bath (at 0 K)
    REAL           :: OhmicGammaTimesMass       !< Gamma of an ohmic spectral density of the bath
    LOGICAL        :: NonLinearCoupling         !< system - bath coupling is non linear
    REAL           :: AlphaCoupling             !< paramter in non linear system-bath coupling

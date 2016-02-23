@@ -153,8 +153,6 @@ PROGRAM leporello
          CALL SetFieldFromInput( InputData, "BathCutOffFreq", BathCutOffFreq, 0.0 )
       END IF
       BathCutOffFreq = BathCutOffFreq * FreqConversion(InputUnits, InternalUnits) 
-      ! Quasi-classical correction of the initial conditions of the bath (ZPE), relevant only for 0K
-      CALL SetFieldFromInput( InputData, "ZPECorrection", ZPECorrection, .FALSE. )
       ! Set lower boundary for oscillator bath frequency
       CALL SetFieldFromInput( InputData, "BathLowerCutOffFreq", BathLowerCutOffFreq, 0.0 )
       BathLowerCutOffFreq = BathLowerCutOffFreq * FreqConversion(InputUnits, InternalUnits) 
@@ -181,8 +179,6 @@ PROGRAM leporello
       BathCutOffFreq = BathCutOffFreq * FreqConversion(InputUnits, InternalUnits) 
       ! Read file with normal modes freq and couplings
       CALL SetFieldFromInput( InputData, "SpectralDensityFile", SpectralDensityFile )
-      ! Quasi-classical correction of the initial conditions of the bath (ZPE), relevant only for 0K
-      CALL SetFieldFromInput( InputData, "ZPECorrection", ZPECorrection, .FALSE. )
 
    ELSE IF ( BathType == LANGEVIN_DYN ) THEN
 
