@@ -50,7 +50,7 @@ Plot_ZCMax    : 0.4
 
 # Stationary states optimization: max nr of steps, threshold of the iterative Newton search
 MaxOptSteps : 1000000
-OptThreshold : 1.E-03
+OptThreshold : 1.E-12
 # Minimum energy path: length of the step along the gradient, max nr of steps
 MEPStep : 0.002
 MaxMEPNrSteps : 500000

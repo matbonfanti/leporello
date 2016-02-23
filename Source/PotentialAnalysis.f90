@@ -17,6 +17,9 @@
 !
 !>  \par Updates
 !>  \arg N.A.
+!>
+!>  \todo print also the first section of the MEP 
+!>  \todo set a variable real value to decide when to start to follow the gradient
 !>                 
 !***************************************************************************************
 MODULE PotentialAnalysis
@@ -113,7 +116,7 @@ MODULE PotentialAnalysis
 
       901 FORMAT(" * Stationary states optimization with Newton's method ",     /,&
                  " * Max nr of steps of the optimization:          ",I10,       /,&
-                 " * Threshold on the gradient:                    ",F10.4,1X,A,/)
+                 " * Threshold on the gradient:                    ",E10.2,1X,A,/)
 
       902 FORMAT(" * Minimum energy path computation ",                         /,&
                  " * Length of the 4th order RK integration step:  ",F10.4,1X,A,/,&
@@ -250,7 +253,7 @@ MODULE PotentialAnalysis
 
       WRITE(*,"(/,A)") " Starting geometry and energy of the MEP " 
       DO i = 1, NDim 
-         WRITE(*,501) GetXLabel(i), X(i)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits)
+         WRITE(*,501) GetXLabel(i), XStart(i)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits)
       END DO
       WRITE(*,502) EStart*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits)
 
