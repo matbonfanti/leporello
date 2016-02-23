@@ -48,9 +48,10 @@ MODULE PotentialAnalysis
    REAL :: OptThreshold    !< Convergence criterium for optimizations
 
    ! Parameters for Minimum Energy Path computation
-   INTEGER :: MaxMEPNrSteps    !< Max number of MEP steps
-   INTEGER :: PrintMEPNrSteps  !< Max number of MEP steps printed to file output
-   REAL    :: MEPStep          !< Size of each MEP step
+   INTEGER :: MaxMEPNrSteps      !< Max number of MEP steps
+   INTEGER :: PrintMEPNrSteps    !< Max number of MEP steps printed to file output
+   REAL    :: MEPStep            !< Size of each MEP step
+   REAL    :: StartMEPThreshold  !< gradient threshold to decide when to start to follow the gradient
 
       CONTAINS
 
@@ -93,7 +94,9 @@ MODULE PotentialAnalysis
       CALL SetFieldFromInput( InputData, "MEPStep", MEPStep, 0.001 )
       MEPStep = MEPStep * LengthConversion(InputUnits, InternalUnits)
       CALL SetFieldFromInput( InputData, "PrintMEPNrSteps", PrintMEPNrSteps, MaxMEPNrSteps )
-      
+      CALL SetFieldFromInput( InputData, "StartMEPThreshold", StartMEPThreshold, 0.05 )
+      StartMEPThreshold = StartMEPThreshold * ForceConversion(InputUnits, InternalUnits)
+
       ! SCREEN LOG OF THE INPUT VARIABLES
       
       LengthConv = LengthConversion(InternalUnits,InputUnits)
@@ -106,7 +109,9 @@ MODULE PotentialAnalysis
       WRITE(*, 901) MaxOptSteps, OptThreshold*ForceConversion(InternalUnits,InputUnits), &
                     TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits))
                     
-      WRITE(*, 902) MEPStep*LengthConv, LengthUnit(InputUnits), MaxMEPNrSteps, PrintMEPNrSteps
+      WRITE(*, 902) StartMEPThreshold*ForceConversion(InternalUnits,InputUnits), &
+                    TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits)), &
+                    MEPStep*LengthConv, LengthUnit(InputUnits), MaxMEPNrSteps, PrintMEPNrSteps
 
       900 FORMAT(" * Plot of a 3D cut of the potential in VTK format ",         /,&
                  " * Grid spacing :                                ",F10.4,1X,A,/,&
@@ -119,6 +124,7 @@ MODULE PotentialAnalysis
                  " * Threshold on the gradient:                    ",E10.2,1X,A,/)
 
       902 FORMAT(" * Minimum energy path computation ",                         /,&
+                 " * Gradient thresh., start MEP in in-channel:    ",F10.4,1X,A,/,&
                  " * Length of the 4th order RK integration step:  ",F10.4,1X,A,/,&
                  " * Max nr of integration steps:                  ",I10,       /,&
                  " * Max nr of steps printed to output:            ",I10,       /)
@@ -290,7 +296,7 @@ MODULE PotentialAnalysis
          ! Compute norm of the gradient
          E = GetPotAndForces( X, A ); GradNorm = SQRT(TheOneWithVectorDotVector(A, A))
          ! Check when the gradient is large
-         IF ( GradNorm > 0.005 ) EXIT
+         IF ( GradNorm > StartMEPThreshold ) EXIT
       END DO
 
       ! Write to output file and to screen the starting point
