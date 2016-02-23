@@ -18,8 +18,7 @@
 !>  \par Updates
 !>  \arg N.A.
 !>
-!>  \todo print also the first section of the MEP 
-!>  \todo set a variable real value to decide when to start to follow the gradient
+!>  \todo N.A.
 !>                 
 !***************************************************************************************
 MODULE PotentialAnalysis
@@ -168,7 +167,7 @@ MODULE PotentialAnalysis
       LOGICAL, DIMENSION(:), ALLOCATABLE :: LogMask
       REAL, DIMENSION(:), ALLOCATABLE    :: EigenFreq
       REAL, DIMENSION(:,:), ALLOCATABLE  :: EigenModes, Hessian
-      REAL, DIMENSION(:,:), ALLOCATABLE  :: StoreMEP
+      REAL, DIMENSION(:,:), ALLOCATABLE  :: StoreMEP, StoreApproach
       REAL    :: EStart, E, GradNorm
       INTEGER :: MEPFullUnit
 
@@ -238,7 +237,7 @@ MODULE PotentialAnalysis
 
       ! Allocate arrays for this section
       ALLOCATE( XStart(NDim), Hessian(NDim, NDim), EigenFreq(NDim), EigenModes(NDim,NDim), LogMask(NDim) )
-      ALLOCATE( StoreMEP(5,MaxMEPNrSteps+2) )
+      ALLOCATE( StoreApproach(5,0:1000), StoreMEP(5,0:MaxMEPNrSteps) )
       
       ! guess reasonable coordinates of the minimum of the PES
       X(1) = 10.0/MyConsts_Bohr2Ang
@@ -287,7 +286,7 @@ MODULE PotentialAnalysis
          X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
          E*EnergyConversion(InternalUnits, InputUnits)
       ! Store step in the data array
-      StoreMEP(:,1) = (/ -1., X(1:3), E /)
+      StoreApproach(:,0) = (/ 0., X(1:3), E /)
 
       ! First follow the incident direction until significant gradient is found
       DO i = 1, 1000
@@ -297,6 +296,21 @@ MODULE PotentialAnalysis
          E = GetPotAndForces( X, A ); GradNorm = SQRT(TheOneWithVectorDotVector(A, A))
          ! Check when the gradient is large
          IF ( GradNorm > StartMEPThreshold ) EXIT
+         StoreApproach(:,i) = (/ i*0.05, X(1:3), E /)
+      END DO
+      NPrint = i - 1
+
+      ! Open output file and write path to file
+      MEPFullUnit = LookForFreeUnit()
+      OPEN( FILE="MEP_Coord_Energy.dat", UNIT=MEPFullUnit )
+      ! Header of the output file
+      WRITE(MEPFullUnit,700) TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), &
+                             TRIM(LengthUnit(InputUnits)), TRIM(EnergyUnit(InputUnits))
+      ! Write approach along the entrance channel
+      DO i = 1, NPrint
+         WRITE(MEPFullUnit,601) (StoreApproach(1,i)-StoreApproach(1,NPrint))*LengthConversion(InternalUnits, InputUnits), &         
+                                StoreApproach(2:4,i)*LengthConversion(InternalUnits, InputUnits), &
+                                StoreApproach(5,i)*EnergyConversion(InternalUnits, InputUnits)
       END DO
 
       ! Write to output file and to screen the starting point
@@ -304,10 +318,10 @@ MODULE PotentialAnalysis
          X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
             E*EnergyConversion(InternalUnits, InputUnits)
       ! Store step in the data array
-      StoreMEP(:,2) = (/ 0., X(1:3), E /)
+      StoreMEP(:,0) = (/ 0., X(1:3), E /)
 
-      NPrint = 2
-      DO i = 2, MaxMEPNrSteps
+      NPrint = 0
+      DO i = 1, MaxMEPNrSteps-1
          ! Following steps
          Check = FollowGradient( X, MEPStep )
          E = GetPotential( X )
@@ -322,10 +336,9 @@ MODULE PotentialAnalysis
             NPrint = NPrint + 1
             StoreMEP(:,NPrint) = (/ i*MEPStep, X(1:3), E /)
          END IF
-
       END DO
-      MaxStep = i - 1
 
+      MaxStep = i - 1
       ! Write to screen final step
       WRITE(*,701)
       E = GetPotential( X )
@@ -338,12 +351,7 @@ MODULE PotentialAnalysis
       StoreMEP(:,NPrint) = (/ MaxStep*MEPStep, X(1:3), E /)
 
 
-      ! Open output file and write path to file
-      MEPFullUnit = LookForFreeUnit()
-      OPEN( FILE="MEP_Coord_Energy.dat", UNIT=MEPFullUnit )
-      ! Header of the output file
-      WRITE(MEPFullUnit,700) TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), TRIM(EnergyUnit(InputUnits))
-      ! Write minus section of the MEP
+      ! Write the MEP
       DO i = 1, NPrint
          WRITE(MEPFullUnit,601) StoreMEP(1:4,i)*LengthConversion(InternalUnits, InputUnits), &
                                 StoreMEP(5,i)*EnergyConversion(InternalUnits, InputUnits)
