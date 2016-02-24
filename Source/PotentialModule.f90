@@ -22,7 +22,7 @@
 !>  \par Updates
 !>  \arg N.A.
 !
-!>  \todo complete log output of subroutine StartSystemForScattering
+!>  \todo N.A.
 !
 !***************************************************************************************
 
@@ -56,6 +56,10 @@ MODULE PotentialModule
    ! Logical control variable for the log of subroutine StartSystemForScattering
    LOGICAL, SAVE  :: LogScattInit = .TRUE.
    
+#if defined(LOG_FILE)
+   CHARACTER(17), SAVE :: LogStr = " SetupPotential |"
+#endif
+
    CONTAINS
 
 !===============================================================================================================================
@@ -73,7 +77,8 @@ MODULE PotentialModule
          IMPLICIT NONE
          LOGICAL, INTENT(IN), OPTIONAL :: DerivTest
          REAL, DIMENSION(:), ALLOCATABLE :: CoordMin, CoordMax         !< Coordinate intervals where to check the derivatives
-
+         INTEGER :: i
+         
          ! exit if module is setup
          IF ( PotentialModuleIsSetup ) RETURN
  
@@ -91,8 +96,12 @@ MODULE PotentialModule
 
 #if defined(LOG_FILE)
       __OPEN_LOG_FILE
-      WRITE(__LOG_UNIT,*) " System potential has been setup"
-      WRITE(__LOG_UNIT,*) " ... (details) ... "
+      WRITE(__LOG_UNIT,"(/,A,A,/)")  LogStr," System potential has been setup"
+      WRITE(__LOG_UNIT,"(A,A,/)")    LogStr," Setup PES is a 3D potential for the Eley-Rideal abstraction of H2 on a graphene surface. "
+      WRITE(__LOG_UNIT,"(A,A,I2,A)") LogStr," PES is a function  of ",NDim," coordinates:"
+      DO i = 1, NDim 
+         WRITE(__LOG_UNIT,"(A,A,I2,A,A)") LogStr," * Coord. ",i," - ",CoordLabels(i)
+      END DO
       __CLOSE_LOG_FILE
 #endif
 
