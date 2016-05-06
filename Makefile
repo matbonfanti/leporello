@@ -13,7 +13,7 @@ LOGFILE = yes
 LOGNAME = leporello.log
 
 # Compiler ( gfortran, ifort )
-FC = ifort     
+FC = galileo
 
 # Debugging options ( yes or no )
 DEBUG =  no 
@@ -243,6 +243,43 @@ ifeq (${FC},hilbert)
    MODULEFLG = -I
 
 endif
+
+ifeq (${FC},galileo)
+
+   # Set name of the intel compiler
+   FC = ifort
+   
+   # Optimization flags
+   O0FLAGS  = -O0
+   O1FLAGS  = -O1
+   O2FLAGS  = -O2
+   O3FLAGS  = -O3
+
+   # Debug flags
+   DEBUGFLG  =  -g -traceback -fpe-all=0 -debug all -check all
+   
+   # Intel mkl with threading
+   LAPACKFLG = -lpthread -lm
+   LAPACKCOMPILE = -mkl=sequential
+
+   # FFTW3 flags
+   FFTW3FLG = -L${FFTW_LIB} -lfftw3 
+   FFTW3COMPILE = -I${FFTW_INC} 
+  
+   # OPENMP flags
+   OPENMPFLG = -openmp
+
+   # Data type
+   DATAFLG =
+   ifeq (${REAL8},yes)
+      DATAFLG = -r8 -i4
+   endif
+  
+   # Flag to specify the position of mod files
+   MODULEFLG = -I
+
+endif
+
 
 
 #----------------------------------------------------------------------------
