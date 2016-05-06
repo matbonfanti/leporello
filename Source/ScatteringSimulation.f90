@@ -491,8 +491,8 @@ MODULE ScatteringSimulation
                   TotEnergy     = PotEnergy + KinEnergy
 
                   ! check the channel which corresponds to the current coordinates of the trajectory
-                  TrajOutcome(GetCurrentChannel(X),jRho,kStep) = &
-                                  TrajOutcome(GetCurrentChannel(X),jRho,kStep) + 1.0
+                  TrajOutcome(GetCurrentChannel(X(1:NSys)),jRho,kStep) = &
+                                  TrajOutcome(GetCurrentChannel(X(1:NSys)),jRho,kStep) + 1.0
 
                   ! If massive level of output, print traj information to std out
                   IF ( PrintType == DEBUG ) THEN
@@ -510,7 +510,7 @@ MODULE ScatteringSimulation
             PRINT "(A)", " Time propagation completed! "
 
             ! print the final values of this trajectory 
-            WRITE(*,700) TRIM(GetChannelLabel(GetCurrentChannel(X)))
+            WRITE(*,700) TRIM(GetChannelLabel(GetCurrentChannel(X(1:NSys))))
             DO iCoord = 1,NSys
                WRITE(*,702) iCoord, X(iCoord)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits)
             END DO
