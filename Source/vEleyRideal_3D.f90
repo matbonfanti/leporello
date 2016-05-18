@@ -163,7 +163,7 @@
 !N.B. everything is in a.u.
 
   !sticking potential for targon and C: it has three parts
-  CALL hstick( 0.0d0, 0.0d0, zt, zc, vstick, dvstick_dxt, dvstick_dyt, dvstick_dzt, dvstick_dzc )
+  CALL hstick( 0.0, 0.0, zt, zc, vstick, dvstick_dxt, dvstick_dyt, dvstick_dzt, dvstick_dzc )
 
   !full potential
   vv = vdiab - vmorse + vstick 
