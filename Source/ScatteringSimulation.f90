@@ -211,14 +211,18 @@ MODULE ScatteringSimulation
       ELSE IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
          NDim = NSys + NBath
       END IF
-      NCoupled = 3
+      NCoupled = NSys
 
       ! Allocate memory and initialize vectors for trajectory, acceleration and masses
       ALLOCATE( X(NDim), V(NDim), A(NDim), MassVector(NDim), LangevinSwitchOn(NDim) )
 
       ! Define vector of the masses
       IF ( BathType == LANGEVIN_DYN ) THEN
-         MassVector = (/ MassHInc, MassHTar, MassC /)
+         IF ( NSys == 3 ) THEN 
+            MassVector = (/ MassHInc, MassHTar, MassC /)
+         ELSE IF ( NSys == 2 ) THEN 
+            MassVector = (/ MassHInc, MassHTar /)
+         END IF
       ELSE IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
          MassVector = (/ MassHInc, MassHTar, MassC, (MassBath, iCoord=1,NBath) /)
       END IF
@@ -382,9 +386,11 @@ MODULE ScatteringSimulation
                ! Do an equilibration run
                EquilibrationCycle: DO iStep = 1, NrEquilibSteps
 
+                  A(1) = 0.0; V(1) = 0.0
+
                   ! PROPAGATION for ONE TIME STEP
                   CALL EOM_LangevinSecondOrder( Equilibration, X, V, A, ScatteringPotential, PotEnergy, RandomNr )
-
+                  
                   ! compute kinetic energy and total energy
                   KinEnergy = EOM_KineticEnergy(Equilibration, V )
                   TotEnergy = PotEnergy + KinEnergy
