@@ -191,6 +191,12 @@ PROGRAM leporello
 
    ! Variable to set the potential derivatives testing
    CALL SetFieldFromInput( InputData, "DerivTesting", DerivTesting, .FALSE. )
+   ! Variables to set sudden and adiabatic approximations
+   CALL SetFieldFromInput( InputData, "AdiabaticV", AdiabaticV, .FALSE. )
+   CALL SetFieldFromInput( InputData, "SuddenV", SuddenV, .FALSE. )
+   CALL ERROR( SuddenV .AND. AdiabaticV, " impossible to choose adiabatic and sudden pot at the same time ")
+   CALL ERROR( (SuddenV .OR. AdiabaticV) .AND. (BathType /= LANGEVIN_DYN .OR. DynamicsGamma /= 0), &
+             " adiabatic and sudden pot available only for system-only microcanonical dynamics" )
 
    !*************************************************************
    !       PRINT OF THE INPUT DATA TO STD OUT
@@ -286,7 +292,13 @@ PROGRAM leporello
    !*************************************************************
 
    ! Setup potential energy surface
-   CALL SetupPotential( DerivTesting  )
+   IF ( AdiabaticV ) THEN
+      CALL SetupPotential( ADIABATIC, DerivTesting  )
+   ELSE IF ( SuddenV ) THEN 
+      CALL SetupPotential( SUDDEN,    DerivTesting  )
+   ELSE
+      CALL SetupPotential( FULLPOT,   DerivTesting  )
+   END IF
 
    !*************************************************************
    !       IO BATH SETUP 

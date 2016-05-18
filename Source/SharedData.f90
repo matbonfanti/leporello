@@ -51,6 +51,10 @@ MODULE SharedData
    !> Logical variable to perform the tests on the derivatives of the potential !!! the code is terminated after the tests !!!
    LOGICAL :: DerivTesting
 
+   ! Logical variables to set reductions of the full potential energy surface
+   LOGICAL :: AdiabaticV                !< adiabatic approximation on the potential
+   LOGICAL :: SuddenV                   !< sudden approximation on the potential
+
    ! INFORMATION ON THE SYSTEM
 
    REAL    :: MassHTar                  !< Mass of the target hydrogen atom

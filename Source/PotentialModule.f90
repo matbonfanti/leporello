@@ -53,12 +53,21 @@ MODULE PotentialModule
    !> Step for computing the numerical derivatives with finite differences
    REAL, PARAMETER :: SmallDelta = 0.00001
 
-   ! Logical control variable for the log of subroutine StartSystemForScattering
+   !> Logical control variable for the log of subroutine StartSystemForScattering
    LOGICAL, SAVE  :: LogScattInit = .TRUE.
    
 #if defined(LOG_FILE)
    CHARACTER(17), SAVE :: LogStr = " SetupPotential |"
 #endif
+
+   !> Variable to define the type of reduced dimensionality calculation
+   INTEGER, SAVE              :: VReducedDim
+   INTEGER, PARAMETER, PUBLIC :: FULLPOT    = 0,  & ! potential used in its full dimensionality
+                                 SUDDEN     = 1,  & ! vibrational dof is frozen in initial position
+                                 ADIABATIC  = 2     ! vibrational dof adiabatically adjusts to other degrees of freedom
+
+   !> Variable to temprarary store optimize value of zc for adiabatic potential
+   REAL, SAVE  :: OptZc = 0.0
 
    CONTAINS
 
@@ -72,9 +81,11 @@ MODULE PotentialModule
 !> terminates the program after the test!
 !>
 !> @param DerivTest     Logical optional variable to set the derivative test
+!> @param ReducedDim    Integer variable to set adiabatic/sudden approx
 !**************************************************************************************
-      SUBROUTINE SetupPotential( DerivTest )
+      SUBROUTINE SetupPotential( ReducedDim, DerivTest )
          IMPLICIT NONE
+         INTEGER, INTENT(IN)           :: ReducedDim
          LOGICAL, INTENT(IN), OPTIONAL :: DerivTest
          REAL, DIMENSION(:), ALLOCATABLE :: CoordMin, CoordMax         !< Coordinate intervals where to check the derivatives
          INTEGER :: i
@@ -85,19 +96,34 @@ MODULE PotentialModule
          ! Potential module is set up
          PotentialModuleIsSetup = .TRUE.
  
+         ! Store the info on static approximation of the potential
+         VReducedDim = ReducedDim
+
          ! Set the number of dimensions
-         NDim = 3
+         IF ( VReducedDim ==  FULLPOT ) THEN
+            NDim = 3
+         ELSE IF ( VReducedDim == SUDDEN .OR. VReducedDim == ADIABATIC ) THEN
+            NDim = 2
+         ELSE
+            CALL AbortWithError( "PotentialModule.SetupPotential: wrong ReducedDim value " )
+         END IF
 
          ! Set the labels of the coordinates
          ALLOCATE( CoordLabels(NDim) )
          CoordLabels(1) = "Hi_z"
          CoordLabels(2) = "Ht_z"
-         CoordLabels(3) = "C_z"
+         IF ( VReducedDim ==  FULLPOT )  CoordLabels(3) = "C_z"
 
 #if defined(LOG_FILE)
       __OPEN_LOG_FILE
       WRITE(__LOG_UNIT,"(/,A,A,/)")  LogStr," System potential has been setup"
-      WRITE(__LOG_UNIT,"(A,A,/)")    LogStr," Setup PES is a 3D potential for the Eley-Rideal abstraction of H2 on a graphene surface. "
+      IF ( VReducedDim ==  FULLPOT ) THEN
+         WRITE(__LOG_UNIT,"(A,A,/)") LogStr," Setup PES is a 3D pot for Eley-Rideal abstraction of H2 on a graphene surface."
+      ELSE IF ( VReducedDim == SUDDEN ) THEN
+         WRITE(__LOG_UNIT,"(A,A,/)") LogStr," Setup PES is a 2D sudden pot for Eley-Rideal abstraction of H2 on a graphene surface."
+      ELSE IF ( VReducedDim == ADIABATIC ) THEN
+         WRITE(__LOG_UNIT,"(A,A,/)") LogStr," Setup PES is a 2D adiab pot for Eley-Rideal abstraction of H2 on a graphene surface."
+      END IF
       WRITE(__LOG_UNIT,"(A,A,I2,A)") LogStr," PES is a function  of ",NDim," coordinates:"
       DO i = 1, NDim 
          WRITE(__LOG_UNIT,"(A,A,I2,A,A)") LogStr," * Coord. ",i," - ",CoordLabels(i)
@@ -142,7 +168,7 @@ MODULE PotentialModule
 
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetXLabel : Module not Setup" )
-         CALL ERROR( iCoord > NDim .OR. iCoord < 1, "PotentialModule.GetXLabel : wrong coordinate number" )
+         CALL ERROR( (iCoord > NDim) .OR. (iCoord < 1), "PotentialModule.GetXLabel : wrong coordinate number" )
          Label = CoordLabels(iCoord)
  
       END FUNCTION GetXLabel
@@ -158,7 +184,7 @@ MODULE PotentialModule
 
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetSystemDimension : Module not Setup" )
-         GetSystemDimension = 3
+         GetSystemDimension = NDim
  
       END FUNCTION GetSystemDimension
 
@@ -261,7 +287,14 @@ MODULE PotentialModule
       REAL FUNCTION GetPotential( Positions ) RESULT(V) 
          IMPLICIT NONE
          REAL, DIMENSION(:), TARGET, INTENT(IN)  :: Positions
-         REAL, DIMENSION(SIZE(Positions))        :: Dummy
+         REAL, DIMENSION(3) :: Dummy
+         REAL               :: FirstDer, SecDer, DeltaF
+         INTEGER            :: NIter, k
+
+         REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
+         REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /) 
+         INTEGER :: NMaxIter = 10000
+         REAL    :: GradThresh = 0.00001
 
          INTERFACE
             SUBROUTINE ER_3D (zi, zt, zc, vv, dv_zi, dv_zt, dv_zc)
@@ -276,7 +309,37 @@ MODULE PotentialModule
          CALL ERROR( size(Positions) /= NDim, "PotentialModule.GetPotential: Positions array dimension mismatch" )
 
          ! Compute energy
-         CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Dummy(1), Dummy(2), Dummy(3) )
+         IF ( VReducedDim ==  FULLPOT ) THEN
+           CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Dummy(1), Dummy(2), Dummy(3) )
+
+         ELSE IF ( VReducedDim == SUDDEN ) THEN
+            CALL ER_3D( Positions(1), Positions(2), 0.691576, V, Dummy(1), Dummy(2), Dummy(3) )
+
+         ELSE IF ( VReducedDim == ADIABATIC ) THEN
+            ! Optimize carbon position with newton method (numerical sec derivs)
+            Iterations: DO NIter = 1, NMaxIter
+               CALL ER_3D( Positions(1), Positions(2), OptZc, V, Dummy(1), Dummy(2), FirstDer )
+               IF ( ABS(FirstDer) > 0.01 ) THEN
+                 OptZc = OptZc - FirstDer
+               ELSE 
+                 SecDer = 0.0
+                 DO k = 1, size(Deltas)
+                    CALL ER_3D( Positions(1), Positions(2), OptZc+Deltas(k)*SmallDelta, V, Dummy(1), Dummy(2), DeltaF )
+                    SecDer = SecDer + Coeffs(k)*DeltaF
+                 END DO
+                 SecDer = SecDer / SmallDelta
+                 IF (ABS(SecDer) < 0.001) THEN
+                    OptZc = OptZc - FirstDer
+                 ELSE
+                    OptZc = OptZc - FirstDer/SecDer
+                 ENDIF
+               END IF
+               IF ( ABS(FirstDer) < GradThresh ) EXIT Iterations
+            END DO Iterations
+            CALL ER_3D( Positions(1), Positions(2), OptZc, V, Dummy(1), Dummy(2), FirstDer )
+         END IF
+
+         
 
       END FUNCTION GetPotential
 
@@ -295,6 +358,13 @@ MODULE PotentialModule
          IMPLICIT NONE
          REAL, DIMENSION(:), TARGET, INTENT(IN)                :: Positions     
          REAL, DIMENSION(SIZE(Positions)), TARGET, INTENT(OUT) :: Forces 
+         REAL               :: FirstDer, SecDer, DeltaF
+         INTEGER            :: NIter, k
+
+         REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
+         REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /) 
+         INTEGER :: NMaxIter = 10000
+         REAL    :: GradThresh = 0.00001
 
          INTERFACE
             SUBROUTINE ER_3D (zi, zt, zc, vv, dv_zi, dv_zt, dv_zc)
@@ -309,7 +379,37 @@ MODULE PotentialModule
          CALL ERROR( size(Positions) /= NDim, "PotentialModule.GetPotAndForces: input array dimension mismatch" )
 
          ! Compute energy
-         CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Forces(1), Forces(2), Forces(3) )
+         IF ( VReducedDim ==  FULLPOT ) THEN
+           CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Forces(1), Forces(2), Forces(3) )
+
+         ELSE IF ( VReducedDim == SUDDEN ) THEN
+            CALL ER_3D( Positions(1), Positions(2), 0.691576, V, Forces(1), Forces(2), FirstDer )
+
+         ELSE IF ( VReducedDim == ADIABATIC ) THEN
+            ! Optimize carbon position with newton method (numerical sec derivs)
+            Iterations: DO NIter = 1, NMaxIter
+               CALL ER_3D( Positions(1), Positions(2), OptZc, V, Forces(1), Forces(2), FirstDer )
+               IF ( ABS(FirstDer) > 0.01 ) THEN
+                 OptZc = OptZc - FirstDer
+               ELSE 
+                 SecDer = 0.0
+                 DO k = 1, size(Deltas)
+                    CALL ER_3D( Positions(1), Positions(2), OptZc+Deltas(k)*SmallDelta, V, Forces(1), Forces(2), DeltaF )
+                    SecDer = SecDer + Coeffs(k)*DeltaF
+                 END DO
+                 SecDer = SecDer / SmallDelta
+                 IF (ABS(SecDer) < 0.001) THEN
+                    OptZc = OptZc - FirstDer
+                 ELSE
+                    OptZc = OptZc - FirstDer/SecDer
+                 ENDIF
+               END IF
+               IF ( ABS(FirstDer) < GradThresh ) EXIT Iterations
+            END DO Iterations
+            CALL ER_3D( Positions(1), Positions(2), OptZc, V, Forces(1), Forces(2), FirstDer )
+         END IF
+
+         ! Compute forces from derivatives
          Forces(:) = - Forces(:)
 
       END FUNCTION GetPotAndForces
@@ -464,7 +564,7 @@ MODULE PotentialModule
             ! SET INITIAL GEOMETRY, OPTIMIZING THE NON-SCATTERING COORDINATES
             X(1) = 10.0000 / MyConsts_Bohr2Ang
             X(2) = 1.45000 / MyConsts_Bohr2Ang
-            X(3) = 0.35000 / MyConsts_Bohr2Ang
+            IF (NDim == 3) X(3) = 0.35000 / MyConsts_Bohr2Ang
             X = NewtonLocator( X, 10**3, 1.E-6, 1.E-6 )
             
             ! COMPUTE HESSIAN, DIVIDE IT BY THE MASSES AND FIND NORMAL MODES
@@ -768,11 +868,7 @@ MODULE PotentialModule
             ! Weigths forces with eigenvalues (hence obtain displacements)
             IF (.NOT.SteepestDescent ) THEN
                DO i = 1, NOpt
-                  IF ( TSCheck ) THEN 
-                     Factors(i) = 0.5 * ( ABS(EigenValues(i)) + SQRT( EigenValues(i)**2 + 4.0 * WrkForces(i)**2  ) )
-                  ELSE
-                     Factors(i) = EigenValues(i)
-                  END IF
+                  Factors(i) = 0.5 * ( ABS(EigenValues(i)) + SQRT( EigenValues(i)**2 + 4.0 * WrkForces(i)**2  ) )
                END DO
                WrkForces(:) =  WrkForces(:) / Factors(:)
             END IF
