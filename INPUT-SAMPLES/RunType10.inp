@@ -68,5 +68,8 @@ MassC  : 12.0
 
 # testing the derivatives of the potential
 DerivTesting : FALSE
+# limiting conditions on the carbon atom (aka sudden and adiab approx)
+SuddenV : FALSE 
+AdiabaticV : FALSE 
 
 # -------------------------------- END OF INPUT FILE -------------------------------------

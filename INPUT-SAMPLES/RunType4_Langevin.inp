@@ -55,7 +55,7 @@ NrOfPrintSteps  : 1000
 
 # Langevin equilibration parameters
 # Friction coefficient 
-EquilRelaxTime :  50.
+EquilRelaxTime : 50.
 # Time step
 EquilTStep : 0.02
 # Nr of time steps of the equilibration dynamics
@@ -77,6 +77,10 @@ ZPECorrection : FALSE
 # Sampling parameters
 # number of trajectories per impact parameter
 NrTrajs   : 1000
+
+# limiting conditions on the carbon atom (aka sudden and adiab approx)
+SuddenV : FALSE
+AdiabaticV : TRUE 
 
 
 # -------------------------------- END OF INPUT FILE -------------------------------------
