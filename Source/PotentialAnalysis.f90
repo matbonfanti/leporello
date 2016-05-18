@@ -78,10 +78,12 @@ MODULE PotentialAnalysis
       ZHTarMin = ZHTarMin * LengthConversion(InputUnits, InternalUnits)
       CALL SetFieldFromInput( InputData, "Plot_ZHTarMax", ZHTarMax )
       ZHTarMax = ZHTarMax * LengthConversion(InputUnits, InternalUnits)
-      CALL SetFieldFromInput( InputData, "Plot_ZCMin", ZCMin )
-      ZCMin = ZCMin * LengthConversion(InputUnits, InternalUnits)
-      CALL SetFieldFromInput( InputData, "Plot_ZCMax", ZCMax )
-      ZCMax = ZCMax * LengthConversion(InputUnits, InternalUnits)
+      IF ( GetSystemDimension( ) == 3 ) THEN
+         CALL SetFieldFromInput( InputData, "Plot_ZCMin", ZCMin )
+         ZCMin = ZCMin * LengthConversion(InputUnits, InternalUnits)
+         CALL SetFieldFromInput( InputData, "Plot_ZCMax", ZCMax )
+         ZCMax = ZCMax * LengthConversion(InputUnits, InternalUnits)
+      ENDIF
 
       ! Set variables for minima and TS optimization
       CALL SetFieldFromInput( InputData, "MaxOptSteps", MaxOptSteps, 10**6 )
@@ -99,11 +101,11 @@ MODULE PotentialAnalysis
       ! SCREEN LOG OF THE INPUT VARIABLES
       
       LengthConv = LengthConversion(InternalUnits,InputUnits)
-      
-      WRITE(*, 900) GridSpacing*LengthConv, LengthUnit(InputUnits), &
-                    GetXLabel(1), ZHIncMin*LengthConv, ZHIncMax*LengthConv, LengthUnit(InputUnits), &
-                    GetXLabel(2), ZHTarMin*LengthConv, ZHTarMax*LengthConv, LengthUnit(InputUnits), &
-                    GetXLabel(3), ZCMin*LengthConv, ZCMax*LengthConv, LengthUnit(InputUnits)
+
+      WRITE(*, 900) GridSpacing*LengthConv, LengthUnit(InputUnits)
+      WRITE(*, 903) GetXLabel(1), ZHIncMin*LengthConv, ZHIncMax*LengthConv, LengthUnit(InputUnits)
+      WRITE(*, 903) GetXLabel(2), ZHTarMin*LengthConv, ZHTarMax*LengthConv, LengthUnit(InputUnits)
+      IF ( GetSystemDimension( ) == 3 ) WRITE(*, 903) GetXLabel(3), ZCMin*LengthConv, ZCMax*LengthConv, LengthUnit(InputUnits)
 
       WRITE(*, 901) MaxOptSteps, OptThreshold*ForceConversion(InternalUnits,InputUnits), &
                     TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits))
@@ -113,10 +115,8 @@ MODULE PotentialAnalysis
                     MEPStep*LengthConv, LengthUnit(InputUnits), MaxMEPNrSteps, PrintMEPNrSteps
 
       900 FORMAT(" * Plot of a 3D cut of the potential in VTK format ",         /,&
-                 " * Grid spacing :                                ",F10.4,1X,A,/,&
-                 " * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A,/,&
-                 " * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A,/,&
-                 " * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A,/ )
+                 " * Grid spacing :                                ",F10.4,1X,A   )
+      903 FORMAT(" * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A)    
 
       901 FORMAT(" * Stationary states optimization with Newton's method ",     /,&
                  " * Max nr of steps of the optimization:          ",I10,       /,&
@@ -144,7 +144,11 @@ MODULE PotentialAnalysis
 
       ! Allocate memory and initialize vectors for positions, forces and masses
       ALLOCATE( X(NDim), A(NDim), MassVector(NDim) )
-      MassVector = (/ MassHInc, MassHTar, MassC /)
+      IF ( GetSystemDimension( ) == 3 ) THEN
+         MassVector = (/ MassHInc, MassHTar, MassC /)
+      ELSE
+         MassVector = (/ MassHInc, MassHTar /)
+      ENDIF
 
    END SUBROUTINE PotentialAnalysis_Initialize
 
@@ -187,25 +191,33 @@ MODULE PotentialAnalysis
       !                (1) 3D pes in VTK format
       ! =========================================================
 
-      PRINT "(/,A)",    " **** Write 3D cut of the PES to output VTR ****"
+      PRINT "(/,A)",    " **** Write cut of the PES to output VTR ****"
 
       ! Set grid dimensions
       NpointZHInc = INT((ZHIncMax-ZHIncMin)/GridSpacing) + 1
       NpointZHTar = INT((ZHTarMax-ZHTarMin)/GridSpacing) + 1
-      NpointZC = INT((ZCMax-ZCMin)/GridSpacing) + 1
+      IF ( GetSystemDimension( ) == 3 ) THEN
+         NpointZC = INT((ZCMax-ZCMin)/GridSpacing) + 1
+      ELSE 
+         NpointZC = 1
+      END IF
 
       ! Allocate temporary array to store potential data and coord grids
       ALLOCATE( PotentialArray( NpointZHInc * NpointZHTar * NpointZC ),   &
                 ZCArray( NpointZC ), ZHIncArray( NpointZHInc ), ZHTarArray( NpointZHTar ) )
     
       ! Define coordinate grids
-      ZCArray    = (/ ( ZCMin    + GridSpacing*(i-1), i=1,NpointZC)    /)
       ZHIncArray = (/ ( ZHIncMin + GridSpacing*(i-1), i=1,NpointZHInc) /)
       ZHTarArray = (/ ( ZHTarMin + GridSpacing*(i-1), i=1,NpointZHTar) /)
-
+      IF ( GetSystemDimension( ) == 3 ) THEN
+         ZCArray    = (/ ( ZCMin    + GridSpacing*(i-1), i=1,NpointZC)    /)
+      ELSE 
+         ZCArray    = (/ 0.0 /)
+      END IF
+      
       ! Open VTK file
-      CALL VTK_NewRectilinearSnapshot(PotentialPlot, FileName="V3D_Plot", X=ZHIncArray*LengthConversion(InternalUnits,InputUnits),& 
-                   Y=ZHTarArray*LengthConversion(InternalUnits,InputUnits), Z=ZCArray*LengthConversion(InternalUnits,InputUnits) )
+      CALL VTK_NewRectilinearSnapshot(PotentialPlot,FileName="V3D_Plot",X=ZHIncArray*LengthConversion(InternalUnits,InputUnits),& 
+                   Y=ZHTarArray*LengthConversion(InternalUnits,InputUnits), Z=ZCArray*LengthConversion(InternalUnits,InputUnits))
 
       nPoint = 0
       ! Cycle over the ZC coordinate values
@@ -216,15 +228,22 @@ MODULE PotentialAnalysis
             DO i = 1, NpointZHInc
                nPoint = nPoint + 1
                ! Compute potential 
-               PotentialArray(nPoint) = GetPotential( (/ ZHIncArray(i), ZHTarArray(j), ZCArray(k) /) )
+               IF ( GetSystemDimension( ) == 3 ) THEN
+                  PotentialArray(nPoint) = GetPotential( (/ ZHIncArray(i), ZHTarArray(j), ZCArray(k) /) )
+               ELSE 
+                  PotentialArray(nPoint) = GetPotential( (/ ZHIncArray(i), ZHTarArray(j) /) )
+               END IF
             END DO
          END DO
       END DO
       ! Print the potential to vtk file
-      CALL VTK_AddScalarField( PotentialPlot, Name="Potential", Field=PotentialArray*EnergyConversion(InternalUnits,InputUnits), &
-                                                                                                            LetFileOpen=.FALSE. )
-
-      WRITE(*,"(/,A)") " * 3D PES as a func of zH_inc, zH_tar and zC written as VTR to file V3D_Plot.vtr"
+      CALL VTK_AddScalarField( PotentialPlot,Name="Potential",Field=PotentialArray*EnergyConversion(InternalUnits,InputUnits), &
+                                                                                                            LetFileOpen=.FALSE.)
+      IF ( GetSystemDimension( ) == 3 ) THEN
+         WRITE(*,"(/,A)") " * 3D PES as a func of zH_inc, zH_tar and zC written as VTR to file V3D_Plot.vtr"
+      ELSE 
+         WRITE(*,"(/,A)") " * 2D PES as a func of zH_inc, zH_tar written as VTR to file V3D_Plot.vtr"
+      END IF
 
       ! Deallocate memory
       DEALLOCATE( PotentialArray, ZCArray, ZHIncArray, ZHTarArray )
@@ -237,15 +256,16 @@ MODULE PotentialAnalysis
 
       ! Allocate arrays for this section
       ALLOCATE( XStart(NDim), Hessian(NDim, NDim), EigenFreq(NDim), EigenModes(NDim,NDim), LogMask(NDim) )
-      ALLOCATE( StoreApproach(5,0:1000), StoreMEP(5,0:MaxMEPNrSteps) )
+      ALLOCATE( StoreApproach(NDim+2,0:1000), StoreMEP(NDim+2,0:MaxMEPNrSteps) )
       
       ! guess reasonable coordinates of the minimum of the PES
       X(1) = 10.0/MyConsts_Bohr2Ang
       X(2) = (0.35+1.1)/MyConsts_Bohr2Ang
-      X(3) = 0.35/MyConsts_Bohr2Ang
+      IF ( GetSystemDimension( ) == 3 ) X(3) = 0.35/MyConsts_Bohr2Ang
 
       ! Find minimum by Newton's optimization
-      LogMask(:) = (/ .FALSE., .TRUE., .TRUE. /)
+      LogMask(:) = .TRUE.
+      LogMask(1) = .FALSE.
       XStart = NewtonLocator( X, MaxOptSteps, OptThreshold, 1.0, LogMask )
       ! Computing the energy at this geometry
       EStart = GetPotAndForces( XStart, A )
@@ -277,16 +297,15 @@ MODULE PotentialAnalysis
       WRITE(*,701)
 
       ! Write header lines screen 
-      WRITE(*,700) TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), TRIM(EnergyUnit(InputUnits))
+      WRITE(*,700) TRIM(LengthUnit(InputUnits)),TRIM(LengthUnit(InputUnits)),&
+                   TRIM(LengthUnit(InputUnits)),TRIM(EnergyUnit(InputUnits))
 
       ! Start from XStart
       X(:) = XStart; E = GetPotential( X )
       ! Write to output file and to screen the starting point
-      WRITE(*,601) -1., X(1)*LengthConversion(InternalUnits, InputUnits), &
-         X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
-         E*EnergyConversion(InternalUnits, InputUnits)
+      WRITE(*,601) -1., E*EnergyConversion(InternalUnits, InputUnits), X(:)*LengthConversion(InternalUnits, InputUnits)
       ! Store step in the data array
-      StoreApproach(:,0) = (/ 0., X(1:3), E /)
+      StoreApproach(:,0) = (/ 0., E, X(1:NDim) /)
 
       ! First follow the incident direction until significant gradient is found
       DO i = 1, 1000
@@ -296,7 +315,7 @@ MODULE PotentialAnalysis
          E = GetPotAndForces( X, A ); GradNorm = SQRT(TheOneWithVectorDotVector(A, A))
          ! Check when the gradient is large
          IF ( GradNorm > StartMEPThreshold ) EXIT
-         StoreApproach(:,i) = (/ i*0.05, X(1:3), E /)
+         StoreApproach(:,i) = (/ i*0.05, E, X(1:NDim) /)
       END DO
       NPrint = i - 1
 
@@ -304,21 +323,19 @@ MODULE PotentialAnalysis
       MEPFullUnit = LookForFreeUnit()
       OPEN( FILE="MEP_Coord_Energy.dat", UNIT=MEPFullUnit )
       ! Header of the output file
-      WRITE(MEPFullUnit,700) TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), &
-                             TRIM(LengthUnit(InputUnits)), TRIM(EnergyUnit(InputUnits))
+      WRITE(MEPFullUnit,700) TRIM(EnergyUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), &
+                             TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits))
       ! Write approach along the entrance channel
       DO i = 1, NPrint
          WRITE(MEPFullUnit,601) (StoreApproach(1,i)-StoreApproach(1,NPrint))*LengthConversion(InternalUnits, InputUnits), &         
-                                StoreApproach(2:4,i)*LengthConversion(InternalUnits, InputUnits), &
-                                StoreApproach(5,i)*EnergyConversion(InternalUnits, InputUnits)
+                                StoreApproach(2,i)*EnergyConversion(InternalUnits, InputUnits), &
+                                StoreApproach(3:2+NDim,i)*LengthConversion(InternalUnits, InputUnits)
       END DO
 
       ! Write to output file and to screen the starting point
-      WRITE(*,601) 0., X(1)*LengthConversion(InternalUnits, InputUnits), &
-         X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
-            E*EnergyConversion(InternalUnits, InputUnits)
+      WRITE(*,601) 0., E*EnergyConversion(InternalUnits, InputUnits), X(:)*LengthConversion(InternalUnits, InputUnits)
       ! Store step in the data array
-      StoreMEP(:,0) = (/ 0., X(1:3), E /)
+      StoreMEP(:,0) = (/ 0., E, X(1:NDim) /)
 
       NPrint = 0
       DO i = 1, MaxMEPNrSteps-1
@@ -327,14 +344,13 @@ MODULE PotentialAnalysis
          E = GetPotential( X )
          IF ( .NOT. Check )  EXIT
          IF ( MOD(i,MaxMEPNrSteps/20) == 0 ) THEN
-             WRITE(*,601) i*MEPStep*LengthConversion(InternalUnits, InputUnits), X(2)*LengthConversion(InternalUnits, InputUnits), &
-            X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
-               E*EnergyConversion(InternalUnits, InputUnits)
+            WRITE(*,601) i*MEPStep*LengthConversion(InternalUnits, InputUnits), E*EnergyConversion(InternalUnits, InputUnits), &
+                         X(:)*LengthConversion(InternalUnits, InputUnits)
          END IF
          ! Store step in the data array (only for a number of steps equal to PrintMEPNrSteps )
          IF ( MOD(i, MaxMEPNrSteps/PrintMEPNrSteps) == 0 ) THEN
             NPrint = NPrint + 1
-            StoreMEP(:,NPrint) = (/ i*MEPStep, X(1:3), E /)
+            StoreMEP(:,NPrint) = (/ i*MEPStep, E, X(1:NDim) /)
          END IF
       END DO
 
@@ -342,25 +358,24 @@ MODULE PotentialAnalysis
       ! Write to screen final step
       WRITE(*,701)
       E = GetPotential( X )
-      WRITE(*,601) MaxStep*MEPStep*LengthConversion(InternalUnits, InputUnits), X(1)*LengthConversion(InternalUnits, InputUnits), &
-            X(2)*LengthConversion(InternalUnits, InputUnits), X(3)*LengthConversion(InternalUnits, InputUnits), &
-               E*EnergyConversion(InternalUnits, InputUnits)
+      WRITE(*,601) MaxStep*MEPStep*LengthConversion(InternalUnits, InputUnits), E*EnergyConversion(InternalUnits, InputUnits), &
+                         X(:)*LengthConversion(InternalUnits, InputUnits)
       WRITE(*,701)
       ! Store final step in the data array 
       NPrint = NPrint + 1
-      StoreMEP(:,NPrint) = (/ MaxStep*MEPStep, X(1:3), E /)
-
+      StoreMEP(:,NPrint) = (/ MaxStep*MEPStep, E, X(1:NDim) /)
 
       ! Write the MEP
       DO i = 1, NPrint
-         WRITE(MEPFullUnit,601) StoreMEP(1:4,i)*LengthConversion(InternalUnits, InputUnits), &
-                                StoreMEP(5,i)*EnergyConversion(InternalUnits, InputUnits)
+         WRITE(MEPFullUnit,601) StoreMEP(1,i)*LengthConversion(InternalUnits, InputUnits), &         
+                                StoreMEP(2,i)*EnergyConversion(InternalUnits, InputUnits), &
+                                StoreMEP(3:2+NDim,i)*LengthConversion(InternalUnits, InputUnits)
       END DO
       ! Close file
       CLOSE(MEPFullUnit)
       
       ! Write the MEP to VTV files
-      CALL VTK_WriteTrajectory ( MEPTraj, StoreMEP(2:4,1:NPrint)*LengthConversion(InternalUnits, InputUnits), "MEP_Trajectory" )
+      CALL VTK_WriteTrajectory( MEPTraj,StoreMEP(3:2+NDim,1:NPrint)*LengthConversion(InternalUnits, InputUnits),"MEP_Trajectory")
 
       
       WRITE(*,"(/,A)") " * Last step reached... MEP written to file ________"
@@ -373,7 +388,7 @@ MODULE PotentialAnalysis
                   "    mass-scaled coords of the normal mode / ",A," : ",4F12.6, / )
 
       601 FORMAT ( F12.4,F20.6,F20.6,F20.6,F20.6 )
-      700 FORMAT ( "#       Step", 10X, "    zH inc", 10X, "    zH tar", 10X, "        zC", 10X, "    Energy", /,  &
+      700 FORMAT ( "#       Step", 10X, "    Energy", 10X, "    zH inc", 10X, "    zH tar", 10X, "        zC", /,  &
                    "#           ", A20              , A20              , A20              , A20              , /,  &
                    "#---------------------------------------------------------------------------------------------" )
       701 FORMAT ( "#---------------------------------------------------------------------------------------------" )
