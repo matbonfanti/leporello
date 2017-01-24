@@ -316,6 +316,8 @@ MODULE PotentialModule
             CALL ER_3D( Positions(1), Positions(2), 0.691576, V, Dummy(1), Dummy(2), Dummy(3) )
 
          ELSE IF ( VReducedDim == ADIABATIC ) THEN
+            CALL AbortWithError(" Adiabatic not yet implemented" )
+
             ! Optimize carbon position with newton method (numerical sec derivs)
             Iterations: DO NIter = 1, NMaxIter
                CALL ER_3D( Positions(1), Positions(2), OptZc, V, Dummy(1), Dummy(2), FirstDer )
@@ -339,9 +341,55 @@ MODULE PotentialModule
             CALL ER_3D( Positions(1), Positions(2), OptZc, V, Dummy(1), Dummy(2), FirstDer )
          END IF
 
-         
-
       END FUNCTION GetPotential
+
+!===============================================================================================================================
+
+!******************************************************************************
+!>  Subroutine to compute special potential expectation values, 
+!>  corresponding to a specific partitioning of the potential energy.
+!>
+!>  @param Positions   array with current coordinates of the system
+!>  @returns Expect    array with the potential expectations values
+!******************************************************************************
+      FUNCTION GetVPartitions( Positions ) RESULT( VPart ) 
+         IMPLICIT NONE
+         REAL, DIMENSION(:), TARGET, INTENT(IN)   :: Positions    
+         REAL, DIMENSION(3)                       :: VPart 
+
+         REAL, DIMENSION(3) :: Dummy
+         REAL, PARAMETER :: H2EqD = 1.51178089965204958905d0  !< equilibrium distance of H2 / Bohr
+         REAL :: zC
+         
+         INTERFACE
+            SUBROUTINE ER_3D (zi, zt, zc, vv, dv_zi, dv_zt, dv_zc)
+               REAL*8, INTENT (IN) :: zi, zt, zc
+               REAL*8, INTENT(OUT) :: vv, dv_zi, dv_zt, dv_zc
+            END SUBROUTINE
+         END INTERFACE
+
+         ! Error if module not have been setup yet
+         CALL ERROR(.NOT. PotentialModuleIsSetup,"PotentialModule.GetVPartitions: module not set")
+         ! Check the number of degree of freedom
+         CALL ERROR( size(Positions) /= NDim, "PotentialModule.GetVPartitions: input array dimension mismatch" )
+
+         IF ( VReducedDim ==  FULLPOT ) THEN
+            zC = Positions(3)
+         ELSE IF ( VReducedDim == SUDDEN ) THEN
+            zC = 0.691576
+         ELSE IF ( VReducedDim == ADIABATIC ) THEN
+            CALL AbortWithError(" Adiabatic not yet implemented" )
+         END IF
+
+         ! 3 expectation values are computed:
+         ! 1) Compute energy of the carbon for H1 and H2 far from surface at eq position
+         CALL ER_3D (100., 100.+H2EqD, zC, VPart(1), Dummy(1), Dummy(2), Dummy(3))
+         ! 2) Compute energy of H-H far from the surface, for the carbon planar
+         CALL ER_3D (Positions(1)+100., Positions(2)+100., 0.0, VPart(2), Dummy(1), Dummy(2), Dummy(3))
+         ! 3) Compute energy of the C-H for the other H far from the surface
+         CALL ER_3D (100., Positions(2), zC, VPart(3), Dummy(1), Dummy(2), Dummy(3))
+         
+      END FUNCTION GetVPartitions
 
 !===============================================================================================================================
 
@@ -386,6 +434,8 @@ MODULE PotentialModule
             CALL ER_3D( Positions(1), Positions(2), 0.691576, V, Forces(1), Forces(2), FirstDer )
 
          ELSE IF ( VReducedDim == ADIABATIC ) THEN
+            CALL AbortWithError(" Adiabatic not yet implemented" )
+
             ! Optimize carbon position with newton method (numerical sec derivs)
             Iterations: DO NIter = 1, NMaxIter
                CALL ER_3D( Positions(1), Positions(2), OptZc, V, Forces(1), Forces(2), FirstDer )
