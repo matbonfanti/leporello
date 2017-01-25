@@ -289,6 +289,7 @@ MODULE ScatteringSimulation
       REAL     ::  ImpactPar, Time, CrossSection
       REAL     ::  TotEnergy, PotEnergy, KinEnergy, KinScatter, KinSubstrate  ! Energy values
       REAL     ::  TempAverage, TempVariance, IstTemperature                  ! Temperature values
+      REAL, DIMENSION(NSys+1+3+3) :: EnergyExpect                             ! Array to store energy values
       ! arrays to store grids useful for results output
       REAL, DIMENSION(NRhoMax+1) :: ImpactParameterGrid
       REAL, DIMENSION(NrOfPrintSteps) :: TimeGrid
@@ -430,11 +431,13 @@ MODULE ScatteringSimulation
             ! INFORMATION ON INITIAL CONDITIONS, INITIALIZATION, OTHER...
             !*************************************************************
 
-            ! Compute kinetic energy and total energy
-            KinEnergy     = EOM_KineticEnergy( MolecularDynamics, V )
-            KinScatter    = EOM_KineticEnergy( MolecularDynamics, V, 1 )
-            KinSubstrate  = KinEnergy - KinScatter
-            TotEnergy     = PotEnergy + KinEnergy
+            ! Compute energy expectation values 
+            EnergyExpect = ExpectationValues( X, V )
+            KinScatter   = EnergyExpect(1)
+            KinSubstrate = SUM(EnergyExpect(2:NSys+1))
+            KinEnergy    = KinScatter + KinSubstrate
+            PotEnergy    = SUM(EnergyExpect(NSys+2:NSys+4))
+            TotEnergy    = PotEnergy + KinEnergy
 
             ! PRINT INITIAL CONDITIONS of THE TRAJECTORY 
             WRITE(*,600)  PotEnergy*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits),    &
@@ -458,8 +461,8 @@ MODULE ScatteringSimulation
                OPEN( Unit=DebugUnitVel, File=OutFileName )
 
                ! Write initial values
-               WRITE( DebugUnitEn, "(/,A)" ) "# TRAJECTORY ENERGY: time / fs | V, Kscatt, Ksub, Kin, E / Eh "
-               WRITE(DebugUnitEn,800) 0.0,  PotEnergy, KinScatter, KinSubstrate, KinEnergy, TotEnergy
+               WRITE( DebugUnitEn,"(/,A)") "# TRAJECTORY ENERGY: time/fs | K_sub(NSys),K_bath,V_sub,V_bath,V_coup,V_p(...)/Eh"
+               WRITE(DebugUnitEn,800) 0.0,  EnergyExpect(:)
 
                WRITE( DebugUnitCoord, "(/,A)" ) "# TRAJECTORY COORD: time / fs | X(1) X(2) ... X(N) / bohr "
                WRITE(DebugUnitCoord,800) 0.0, (/(X(iCoord), iCoord=1,NSys)/), (/(X(iCoord)+0.05*iCoord, iCoord=NSys+1,NDim)/)
@@ -490,11 +493,13 @@ MODULE ScatteringSimulation
                   kStep = kStep+1
                   IF ( kStep > NrOfPrintSteps ) CYCLE 
 
-                  ! Compute kinetic energy and total energy
-                  KinEnergy     = EOM_KineticEnergy( MolecularDynamics, V )
-                  KinScatter    = EOM_KineticEnergy( MolecularDynamics, V, 1 )
-                  KinSubstrate  = KinEnergy - KinScatter
-                  TotEnergy     = PotEnergy + KinEnergy
+                  ! Compute energy expectation values 
+                  EnergyExpect = ExpectationValues( X, V )
+                  KinScatter   = EnergyExpect(1)
+                  KinSubstrate = SUM(EnergyExpect(2:NSys+1))
+                  KinEnergy    = KinScatter + KinSubstrate
+                  PotEnergy    = SUM(EnergyExpect(NSys+2:NSys+4))
+                  TotEnergy    = PotEnergy + KinEnergy
 
                   ! check the channel which corresponds to the current coordinates of the trajectory
                   TrajOutcome(GetCurrentChannel(X(1:NSys)),jRho,kStep) = &
@@ -502,8 +507,7 @@ MODULE ScatteringSimulation
 
                   ! If massive level of output, print traj information to std out
                   IF ( PrintType == DEBUG ) THEN
-                     WRITE(DebugUnitEn,800) TimeStep*real(iStep)/MyConsts_fs2AU, &
-                                           PotEnergy, KinScatter, KinSubstrate, KinEnergy, TotEnergy
+                     WRITE(DebugUnitEn,800) TimeStep*real(iStep)/MyConsts_fs2AU, EnergyExpect(:)
                      WRITE(DebugUnitCoord,800) TimeStep*real(iStep)/MyConsts_fs2AU, X(1:4), &
                                              (/ (X(iCoord+4)+0.05*iCoord, iCoord = 1, NDim-4) /)
                      WRITE(DebugUnitVel,800) TimeStep*real(iStep)/MyConsts_fs2AU, V(:)
@@ -641,6 +645,7 @@ MODULE ScatteringSimulation
 !===============================================================================================================================
 
    REAL FUNCTION ScatteringPotential( Positions, Forces )
+      IMPLICIT NONE
       REAL, DIMENSION(:), TARGET, INTENT(IN)  :: Positions
       REAL, DIMENSION(:), TARGET, INTENT(OUT) :: Forces
       REAL :: CouplingFs, DTimesX
@@ -670,5 +675,54 @@ MODULE ScatteringSimulation
    END FUNCTION ScatteringPotential
 
 ! ===============================================================================================================================
+
+!**************************************************************************************
+!> Return current values of the energy expectation values at given time 
+!> to be averaged over the trajectories ensamble.
+!>
+!> @param Positions        Array with current positions
+!> @param Velocities       Array with current velocities
+!> @returns Expectations   Array with the energy expectation values
+!**************************************************************************************
+   FUNCTION ExpectationValues( X, V ) RESULT( Expectations )
+      IMPLICIT NONE
+      REAL, DIMENSION(NSys+1+3+3) :: Expectations   ! NSys+1 kin e, 3 pot e and 3 pot partitions
+      REAL, DIMENSION(:), TARGET, INTENT(IN)  :: X
+      REAL, DIMENSION(:), TARGET, INTENT(IN)  :: V
+
+      REAL :: VCoupling, VBath
+      INTEGER :: i
+      
+      ! 1 -- NSys) kinetic energies of the subsystem coordinates
+      DO i = 1, NSys 
+         Expectations(i) = EOM_KineticEnergy(MolecularDynamics, V, i, i)
+      END DO
+      
+      ! NSys+1 ) bath kinetic energy
+      IF ( BathType == LANGEVIN_DYN ) THEN
+         Expectations(NSys+1) = 0.0
+      ELSE IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
+         Expectations(NSys+1) = EOM_KineticEnergy(MolecularDynamics, V, NDim, NSys+1)
+      END IF
+      
+      ! NSys+2 ) potential energy of the subsystem
+      Expectations(NSys+2) = GetPotential( X(1:NSys) )
+      ! NSys+3 ) potential energy of the bath
+      ! NSys+4 ) system-bath coupling energy 
+      IF ( BathType == LANGEVIN_DYN ) THEN
+         Expectations(NSys+3:NSys+4) = 0.0
+      ELSE IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
+         CALL EnergyOfTheBath( Bath, X(NCoupled), X(NSys+1:), VCoupling, VBath )
+         Expectations(NSys+3) = VBath
+         Expectations(NSys+4) = VCoupling
+      END IF
+      
+      ! Compute potential energy partitioning
+      ! NSys+4) potential energy of the carbon for H1 and H2 far from surface at eq position
+      ! NSys+5) potential energy of H-H, for non interacting planar carbon
+      ! NSys+6) potential energy of the C-H, with other H non interacting
+      Expectations(NSys+5:NSys+7) = GetVPartitions( X(1:NSys) )
+      
+   END FUNCTION ExpectationValues
 
 END MODULE ScatteringSimulation
