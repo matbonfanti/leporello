@@ -803,13 +803,13 @@ MODULE ClassicalEqMotion
          DO iBead = 1, EvolData%NBeads
             DO iDoF = 1, NDoF
                N = N + 1
-               IF (iDoF < NMin) CYCLE
+               IF (iDoF < NStart) CYCLE
                KinEnergy = KinEnergy + 0.5 * EvolData%Mass(iDoF) * Vel(N)**2
             END DO
          END DO
 
       ELSE IF ( .NOT. EvolData%HasRingPolymer ) THEN
-         DO iDoF = NMin, NDoF
+         DO iDoF = NStart, NDoF
             KinEnergy = KinEnergy + 0.5 * EvolData%Mass(iDoF) * Vel(iDoF)**2
          END DO
 
