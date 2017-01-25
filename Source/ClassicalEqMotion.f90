@@ -769,21 +769,32 @@ MODULE ClassicalEqMotion
    
 !*******************************************************************************
 !> Compute kinetic energy corresponding to a given velocity vector.
+!> First and last degree of freedom to consider in the kinetic energy
+!> summation can be specified with optional arguments NMax and NMin
 !>
 !> @param EvolData     Evolution data type
 !> @param Velocity     Array containing the velocity at given time step
+!> @param NMax         Maximum dof index to include in the kin energy  
+!> @param NMin         Minimum dof index to include in the kin energy 
 !*******************************************************************************
-   REAL FUNCTION EOM_KineticEnergy( EvolData, Vel, NMax ) RESULT( KinEnergy )
+   REAL FUNCTION EOM_KineticEnergy( EvolData, Vel, NMax, NMin ) RESULT( KinEnergy )
       IMPLICIT NONE
       TYPE( Evolution ), INTENT(INOUT)    :: EvolData
       REAL, DIMENSION(:), INTENT(INOUT)   :: Vel
       INTEGER, INTENT(IN), OPTIONAL       :: NMax
-      INTEGER :: iDoF, iBead, N, NDoF
+      INTEGER, INTENT(IN), OPTIONAL       :: NMin
+      INTEGER :: iDoF, iBead, N, NDoF, NStart
       
       IF (.NOT. PRESENT( NMax )) THEN
          NDoF = EvolData%NDoF
       ELSE 
          NDoF = MIN(NMax,EvolData%NDoF)
+      END IF
+
+      IF (.NOT. PRESENT( NMin )) THEN
+         NStart = 1
+      ELSE 
+         NStart = MAX(NMin,1)
       END IF
 
       KinEnergy = 0.0
@@ -792,12 +803,13 @@ MODULE ClassicalEqMotion
          DO iBead = 1, EvolData%NBeads
             DO iDoF = 1, NDoF
                N = N + 1
+               IF (iDoF < NMin) CYCLE
                KinEnergy = KinEnergy + 0.5 * EvolData%Mass(iDoF) * Vel(N)**2
             END DO
          END DO
 
       ELSE IF ( .NOT. EvolData%HasRingPolymer ) THEN
-         DO iDoF = 1, NDoF
+         DO iDoF = NMin, NDoF
             KinEnergy = KinEnergy + 0.5 * EvolData%Mass(iDoF) * Vel(iDoF)**2
          END DO
 
