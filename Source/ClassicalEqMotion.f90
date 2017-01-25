@@ -780,7 +780,7 @@ MODULE ClassicalEqMotion
    REAL FUNCTION EOM_KineticEnergy( EvolData, Vel, NMax, NMin ) RESULT( KinEnergy )
       IMPLICIT NONE
       TYPE( Evolution ), INTENT(INOUT)    :: EvolData
-      REAL, DIMENSION(:), INTENT(INOUT)   :: Vel
+      REAL, DIMENSION(:), INTENT(IN)      :: Vel
       INTEGER, INTENT(IN), OPTIONAL       :: NMax
       INTEGER, INTENT(IN), OPTIONAL       :: NMin
       INTEGER :: iDoF, iBead, N, NDoF, NStart
