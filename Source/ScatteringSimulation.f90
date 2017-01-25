@@ -255,7 +255,7 @@ MODULE ScatteringSimulation
 
       ! Allocate and initialize the variables for the trajectory averages
       IF ( PrintType >= FULL ) THEN 
-         ALLOCATE( EnergyAver(NSys+1+3+3,0:GetNrChannels()-1,0:NRhoMax,NrOfPrintSteps) )
+         ALLOCATE( EnergyAver(NSys+1+3+1+3,0:GetNrChannels()-1,0:NRhoMax,NrOfPrintSteps) )
          EnergyAver = 0.0
       END IF
       
@@ -288,7 +288,7 @@ MODULE ScatteringSimulation
       REAL     ::  ImpactPar, Time, CrossSection
       REAL     ::  TotEnergy, PotEnergy, KinEnergy, KinScatter, KinSubstrate  ! Energy values
       REAL     ::  TempAverage, TempVariance, IstTemperature                  ! Temperature values
-      REAL, DIMENSION(NSys+1+3+3) :: EnergyExpect                             ! Array to store energy values
+      REAL, DIMENSION(NSys+1+3+1+3) :: EnergyExpect                           ! Array to store energy values
       ! arrays to store grids useful for results output
       REAL, DIMENSION(NRhoMax+1) :: ImpactParameterGrid
       REAL, DIMENSION(NrOfPrintSteps) :: TimeGrid
@@ -733,11 +733,11 @@ MODULE ScatteringSimulation
 !**************************************************************************************
    FUNCTION ExpectationValues( X, V ) RESULT( Expectations )
       IMPLICIT NONE
-      REAL, DIMENSION(NSys+1+3+3) :: Expectations   ! NSys+1 kin e, 3 pot e and 3 pot partitions
+      REAL, DIMENSION(NSys+1+3+1+3) :: Expectations   ! NSys+1 kin e, 3 pot e and 3 pot partitions
       REAL, DIMENSION(:), TARGET, INTENT(IN)  :: X
       REAL, DIMENSION(:), TARGET, INTENT(IN)  :: V
 
-      REAL :: VCoupling, VBath
+      REAL :: VCoupling, VBath, ReducedMass
       INTEGER :: i
       
       ! 1 -- NSys) kinetic energies of the subsystem coordinates
@@ -764,11 +764,15 @@ MODULE ScatteringSimulation
          Expectations(NSys+4) = VCoupling
       END IF
       
+      ! Compute internal energy corresponding to Hinc-Htar fragment
+      ReducedMass = 1.0/(1./MassVector(1)+1./MassVector(2))
+      Expectations(NSys+5) = 0.5 * ReducedMass * (V(1)-V(2))**2
+      
       ! Compute potential energy partitioning
       ! NSys+4) potential energy of the carbon for H1 and H2 far from surface at eq position
       ! NSys+5) potential energy of H-H, for non interacting planar carbon
       ! NSys+6) potential energy of the C-H, with other H non interacting
-      Expectations(NSys+5:NSys+7) = GetVPartitions( X(1:NSys) )
+      Expectations(NSys+6:NSys+8) = GetVPartitions( X(1:NSys) )
       
    END FUNCTION ExpectationValues
 
