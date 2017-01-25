@@ -35,6 +35,7 @@ MODULE PotentialModule
    PUBLIC :: SetupPotential                                        !< setup subroutine
    PUBLIC :: GetXLabel, GetSystemDimension, PESIsCollinear         !< info subroutines
    PUBLIC :: GetPotential, GetPotAndForces, GetSecondDerivatives   !< get potential and forces, and second derivatives
+   PUBLIC :: GetVPartitions                                        !< get pot energy partitioned according to some relevant scheme
    PUBLIC :: SteepLocator, NewtonLocator                           !< optimization and stationary points
    PUBLIC :: StartSystemForScattering                              !< system initial conditions subroutines
    PUBLIC :: GetNrChannels, GetChannelLabel, GetCurrentChannel     !< trajectory analysis
