@@ -360,7 +360,7 @@ MODULE PotentialModule
 
          REAL, DIMENSION(3) :: Dummy
          REAL, PARAMETER :: H2EqD = 1.51178089965204958905d0  !< equilibrium distance of H2 / Bohr
-         REAL :: zC
+         REAL :: zC, E1, E2
          
          INTERFACE
             SUBROUTINE ER_3D (zi, zt, zc, vv, dv_zi, dv_zt, dv_zc)
@@ -384,8 +384,9 @@ MODULE PotentialModule
 
          ! 3 expectation values are computed:
          ! 1) Compute energy of the carbon for H1 and H2 far from surface at eq position
-         CALL ER_3D (100., 100.+H2EqD, zC, VPart(1), Dummy(1), Dummy(2), Dummy(3)) - &
-              ER_3D (100., 100.+H2EqD, 0.0, VPart(1), Dummy(1), Dummy(2), Dummy(3)) 
+         CALL ER_3D (100., 100.+H2EqD, zC,  E1, Dummy(1), Dummy(2), Dummy(3)) 
+         CALL ER_3D (100., 100.+H2EqD, 0.0, E2, Dummy(1), Dummy(2), Dummy(3)) 
+         VPart(1) = E1-E2
          ! 2) Compute energy of H-H far from the surface, for the carbon planar
          CALL ER_3D (Positions(1)+100., Positions(2)+100., 0.0, VPart(2), Dummy(1), Dummy(2), Dummy(3))
          ! 3) Compute energy of the C-H for the other H far from the surface
