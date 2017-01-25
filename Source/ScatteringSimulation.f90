@@ -68,12 +68,9 @@ MODULE ScatteringSimulation
    TYPE(Evolution),SAVE :: MolecularDynamics     !< Propagate in micro/macrocanonical ensamble to extract results
    TYPE(Evolution),SAVE :: Equilibration         !< Propagate in macrocanonical ensamble at given T to generate init conditions
 
-!    ! Averages computed during propagation
-!    REAL, DIMENSION(:), ALLOCATABLE      :: AverageZHydro      !< Average position of zH vs time
-!    REAL, DIMENSION(:), ALLOCATABLE      :: AverageVHydro      !< Average velocity of zH vs time
-!    REAL, DIMENSION(:), ALLOCATABLE      :: AverageZCarbon     !< Average position of zC vs time
-!    REAL, DIMENSION(:), ALLOCATABLE      :: AverageVCarbon     !< Average velocity of zC vs time
+   ! Averages computed during propagation
    REAL, DIMENSION(:,:,:), ALLOCATABLE    :: TrajOutcome        !< prob of the different channels vs time and impact parameter
+   REAL, DIMENSION(:,:,:,:), ALLOCATABLE  :: EnergyAver         !< energy average values
 
    ! Random number generator internal status
    TYPE(RNGInternalState), SAVE :: RandomNr    !< spectial type dat to store internal status of random nr generator
@@ -254,15 +251,17 @@ MODULE ScatteringSimulation
       ! Initialize random number seed
       CALL SetSeed( RandomNr, -1 )
 
-       ! ALLOCATE AND INITIALIZE DATA WITH THE AVERAGES OVER THE SET OF TRAJECTORIES
+      ! ALLOCATE AND INITIALIZE DATA WITH THE AVERAGES OVER THE SET OF TRAJECTORIES
 
-!       ! Allocate and initialize the variables for the trajectory averages
-!       ALLOCATE( AverageVHydro(0:NrOfPrintSteps), AverageZHydro(0:NrOfPrintSteps) )
-!       ALLOCATE( AverageVCarbon(0:NrOfPrintSteps), AverageZCarbon(0:NrOfPrintSteps) )
-! 
-       ! Allocate and initialize channel resolved probability array
-       ALLOCATE( TrajOutcome(0:GetNrChannels()-1,0:NRhoMax,NrOfPrintSteps) )
-       TrajOutcome = 0.0
+      ! Allocate and initialize the variables for the trajectory averages
+      IF ( PrintType >= FULL ) THEN 
+         ALLOCATE( EnergyAver(NSys+1+3+3,0:GetNrChannels()-1,0:NRhoMax,NrOfPrintSteps) )
+         EnergyAver = 0.0
+      END IF
+      
+      ! Allocate and initialize channel resolved probability array
+      ALLOCATE( TrajOutcome(0:GetNrChannels()-1,0:NRhoMax,NrOfPrintSteps) )
+      TrajOutcome = 0.0
 
       ! Check that a non collinear V is considered when running a non collinear simulation
       IF (NRhoMax > 0) THEN
@@ -281,7 +280,7 @@ MODULE ScatteringSimulation
       IMPLICIT NONE
       ! Output units
       INTEGER :: TEquilUnit, DebugUnitEn, DebugUnitCoord, DebugUnitVel       ! DEBUG
-      INTEGER  ::  CollinearProbUnit!, CrossSectionUnit, OpacityUnit
+      INTEGER  ::  CollinearProbUnit, EnergyAverUnit!, CrossSectionUnit, OpacityUnit
       CHARACTER(100) :: OutFileName                                          ! string to define output file name
       ! Integer indices
       INTEGER  ::  jRho, iTraj, iStep, kStep, iCoord, iChan
@@ -502,9 +501,13 @@ MODULE ScatteringSimulation
                   TotEnergy    = PotEnergy + KinEnergy
 
                   ! check the channel which corresponds to the current coordinates of the trajectory
-                  TrajOutcome(GetCurrentChannel(X(1:NSys)),jRho,kStep) = &
-                                  TrajOutcome(GetCurrentChannel(X(1:NSys)),jRho,kStep) + 1.0
-
+                  iChan = GetCurrentChannel(X(1:NSys))
+                  ! increment the array to compute channel probability
+                  TrajOutcome(iChan,jRho,kStep) = TrajOutcome(iChan,jRho,kStep) + 1.0
+                  ! increment the array to compute energy averages
+                  IF ( PrintType >= FULL ) &
+                     EnergyAver(:,iChan,jRho,kStep) = EnergyAver(:,iChan,jRho,kStep) + EnergyExpect
+                  
                   ! If massive level of output, print traj information to std out
                   IF ( PrintType == DEBUG ) THEN
                      WRITE(DebugUnitEn,800) TimeStep*real(iStep)/MyConsts_fs2AU, EnergyExpect(:)
@@ -538,6 +541,21 @@ MODULE ScatteringSimulation
 
       END DO ImpactParameter
 
+      ! Normalize energy average
+      IF ( PrintType >= FULL ) THEN 
+         DO iStep= 1, NrOfPrintSteps
+            DO jRho = 0, NRhoMax
+               DO iChan = 0, GetNrChannels( )-1
+                  ! When the channel at given time and rho is populated, average is well defined
+                  IF ( TrajOutcome(iChan,jRho,iStep) /= 0.0 ) &
+                     EnergyAver(:,iChan,jRho,iStep) = &
+                           EnergyAver(:,iChan,jRho,iStep) / TrajOutcome(iChan,jRho,iStep)
+                  ! When the channel is not populated, average is left equal to zero
+               END DO
+            END DO
+         END DO
+      END IF
+      
       ! Normalize probability 
       TrajOutcome(:,:,:) = TrajOutcome(:,:,:) / NrTrajs
 
@@ -567,6 +585,30 @@ MODULE ScatteringSimulation
       END DO
       CLOSE(CollinearProbUnit)
 
+      ! Print to file the average energies
+      IF ( PrintType >= FULL ) THEN 
+         EnergyAverUnit = LookForFreeUnit()
+         ! Loop over the channels (one file per channel)
+         DO iChan = 0, GetNrChannels( )-1
+            ! Set file name and open unit
+            WRITE(OutFileName,"(A,I3.3,A)") "AvEnergy_Channel_",iChan,".dat"
+            OPEN( FILE=TRIM(OutFileName), UNIT=EnergyAverUnit )
+            WRITE(EnergyAverUnit,"(A,/)")  "# Energy averages for channel: "//GetChannelLabel(iChan)
+            WRITE(EnergyAverUnit,"(A,2/)") "# time / "// TRIM(TimeUnit(InputUnits)) // &
+               " | K_sub(NSys), K_bath, V_sub, V_bath, V_coup, V_part(...) / " // TRIM(EnergyUnit(InputUnits))
+            ! Loop over the impact parameter (section per each impact values are appended one after the other)
+            DO jRho = 0, NRhoMax
+               WRITE(EnergyAverUnit,"(A,F15.6,A/)")  "# Impact parameters ",ImpactParameterGrid(jRho),LengthUnit(InputUnits)
+               DO iStep= 1, NrOfPrintSteps
+                  WRITE(EnergyAverUnit,800) TimeGrid(iStep), &
+                     EnergyAver(:,iChan,jRho,iStep)*EnergyConversion(InternalUnits,InputUnits)
+               END DO
+            END DO
+            ! Close unit
+            CLOSE(EnergyAverUnit)
+         END DO
+      END IF
+      
 !       ! write cross section data 
 !       IF ( NRhoMax > 0 ) THEN
 ! 
@@ -603,6 +645,8 @@ MODULE ScatteringSimulation
 ! 
 !       END IF
 
+
+
    500 FORMAT (/, " Equilibration averages                 ",/     &
                   " * Average temperature              ",1F10.4,1X,A,/ &
                   "   Standard deviation               ",1F10.4,1X,A,/ ) 
@@ -634,8 +678,11 @@ MODULE ScatteringSimulation
 
       ! Deallocate memory
       DEALLOCATE( X, V, A, MassVector )
-!       DEALLOCATE( AverageVHydro, AverageZHydro, AverageVCarbon, AverageZCarbon, TrappingProb )
 
+      ! Deallocate arrays for averages and probabilities
+      IF (ALLOCATED(TrajOutcome)) DEALLOCATE(TrajOutcome)
+      IF (ALLOCATED(EnergyAver)) DEALLOCATE(EnergyAver)
+      
       ! Unset propagators 
       CALL DisposeEvolutionData( MolecularDynamics )
       CALL DisposeEvolutionData( Equilibration )
