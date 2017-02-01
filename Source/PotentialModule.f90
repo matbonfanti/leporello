@@ -523,13 +523,17 @@ MODULE PotentialModule
 !> @param Mask      Input vector, with the logical mask of the constraints
 !> @returns         Constrained Hessian matrix of dimension COUNT(Maks)
 !**************************************************************************************
-      FUNCTION ConstrainedHessian( Hessian, Mask )
+      FUNCTION ConstrainedHessian( Hessian, Mask, NMask )
          IMPLICIT NONE
          REAL, DIMENSION(:,:), INTENT(IN) :: Hessian
          LOGICAL, DIMENSION(SIZE(Hessian,1)), INTENT(IN) :: Mask
-         REAL, DIMENSION(COUNT(Mask),COUNT(Mask)) :: ConstrainedHessian
+         INTEGER, INTENT(IN) :: NMask
+         REAL, DIMENSION(NMask,NMask) :: ConstrainedHessian
          INTEGER :: i,j, n1,n2
          
+         CALL ERROR( NMask /= COUNT(Mask), &
+            " PotentialModule.ConstrainedVector: wrong input dimension" )
+            
          n1 = 0
          DO i = 1, SIZE(Hessian,2)
             IF ( .NOT. Mask(i) ) CYCLE
@@ -551,15 +555,20 @@ MODULE PotentialModule
 !>
 !> @param Vector    Input vector to project
 !> @param Mask      Input vector, with the logical mask of the constraints
+!> @param N         Input integer with the number of true values of Mask
 !> @returns         Constrained vector of dimension COUNT(Maks)
 !**************************************************************************************
-      FUNCTION ConstrainedVector( Vector, Mask )
+      FUNCTION ConstrainedVector( Vector, Mask, NMask )
          IMPLICIT NONE
          REAL, DIMENSION(:), INTENT(IN) :: Vector
          LOGICAL, DIMENSION(SIZE(Vector)), INTENT(IN) :: Mask
-         REAL, DIMENSION(COUNT(Mask)) :: ConstrainedVector
+         INTEGER, INTENT(IN) :: NMask
+         REAL, DIMENSION(NMask) :: ConstrainedVector
          INTEGER :: i, n
 
+         CALL ERROR( NMask /= COUNT(Mask), &
+            " PotentialModule.ConstrainedVector: wrong input dimension" )
+         
          n = 0
          DO i = 1, size(Vector)
             IF ( Mask(i) ) THEN
@@ -567,7 +576,6 @@ MODULE PotentialModule
                ConstrainedVector(n) = Vector(i)
             END IF
          END DO
-         
       END FUNCTION ConstrainedVector
 
 !===============================================================================================================================
@@ -896,8 +904,8 @@ MODULE PotentialModule
 
             ! Apply constraints
             IF ( PRESENT(Mask) ) THEN
-               WrkForces = ConstrainedVector( Forces, Mask )
-               WrkHessian = ConstrainedHessian( Hessian, Mask )
+               WrkForces = ConstrainedVector( Forces, Mask, COUNT(Mask) )
+               WrkHessian = ConstrainedHessian( Hessian, Mask, COUNT(Mask) )
             ELSE 
                WrkForces = Forces
                WrkHessian = Hessian
@@ -917,7 +925,7 @@ MODULE PotentialModule
             CALL TheOneWithDiagonalization( WrkHessian, EigenVectors, EigenValues )
             ! Transform forces to normal modes
             WrkForces = TheOneWithMatrixVectorProduct( TheOneWithTransposeMatrix(EigenVectors), WrkForces )
-
+            
             ! Weigths forces with eigenvalues (hence obtain displacements)
             IF (.NOT.SteepestDescent ) THEN
                DO i = 1, NOpt
@@ -979,7 +987,7 @@ MODULE PotentialModule
          IF ( PRESENT(Mask) ) THEN
             ! Compute constrained Hessian at current position
             Hessian = GetSecondDerivatives( CurrentX )
-            WrkHessian = ConstrainedHessian( Hessian, Mask )
+            WrkHessian = ConstrainedHessian( Hessian, Mask, COUNT(Mask) )
          ELSE
             ! compute Hessian at current position
             WrkHessian = GetSecondDerivatives( CurrentX )
