@@ -35,7 +35,7 @@ MODULE PotentialAnalysis
    PUBLIC :: PotentialAnalysis_ReadInput, PotentialAnalysis_Initialize, PotentialAnalysis_Run, PotentialAnalysis_Dispose
 
    !> Dimensions of the potential
-   INTEGER :: NDim
+   INTEGER, SAVE :: NDim
 
    !> Input variables for the 3D potential plot 
    REAL :: ZHIncMin, ZHIncMax, ZHTarMin, ZHTarMax, ZCMin, ZCMax           !< boundaries of the grid
@@ -249,7 +249,7 @@ MODULE PotentialAnalysis
       DEALLOCATE( PotentialArray, ZCArray, ZHIncArray, ZHTarArray )
 
       ! =========================================================
-      !                 (2) minimum energy path
+      !                 (2) asymptotic initial geometry
       ! =========================================================
 
       PRINT "(/,A)",    " **** Starting geometry of the MEP ****"
@@ -266,6 +266,7 @@ MODULE PotentialAnalysis
       ! Find minimum by Newton's optimization
       LogMask(:) = .TRUE.
       LogMask(1) = .FALSE.
+      
       XStart = NewtonLocator( X, MaxOptSteps, OptThreshold, 1.0, LogMask )
       ! Computing the energy at this geometry
       EStart = GetPotAndForces( XStart, A )
@@ -293,6 +294,10 @@ MODULE PotentialAnalysis
          END IF
       END DO
 
+      ! =========================================================
+      !                 (3) minimum energy path
+      ! =========================================================
+      
       PRINT "(/,A,/)",    " **** Minimum energy path ****"
       WRITE(*,701)
 
@@ -380,6 +385,46 @@ MODULE PotentialAnalysis
       
       WRITE(*,"(/,A)") " * Last step reached... MEP written to file ________"
 
+      ! =========================================================
+      !                 (4) asymptotic final geometry
+      ! =========================================================
+
+      PRINT "(/,A)",    " **** Final asymptotic geometry ****"
+
+      ! guess reasonable coordinates of the minimum of the PES in the asymptotic out channel
+      X(1) = 20.0/MyConsts_Bohr2Ang
+      X(2) = X(1)-0.35/MyConsts_Bohr2Ang
+      IF ( GetSystemDimension( ) == 3 ) X(3) = 0.0/MyConsts_Bohr2Ang
+
+      ! Find minimum by Newton's optimization
+      LogMask(:) = .TRUE.
+      X = NewtonLocator( X, MaxOptSteps, OptThreshold, 1.0, LogMask )
+      ! Computing the energy at this geometry
+      E = GetPotAndForces( X, A )
+
+      ! Compute normal modes 
+      ! Numerical hessian of the system potential
+      Hessian = GetHessian( X )
+      ! Diagonalize the hessian
+      CALL TheOneWithDiagonalization( Hessian, EigenModes, EigenFreq )
+
+      WRITE(*,"(/,A)") " Final asymptotic geometry and energy of the MEP " 
+      DO i = 1, NDim 
+         WRITE(*,501) GetXLabel(i), X(i)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits)
+      END DO
+      WRITE(*,502) E*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits)
+
+      WRITE(*,"(/,A)") " Potential normal modes at the final asymptotic geometry" 
+      DO i = 1, NDim 
+         IF ( EigenFreq(i) > 0.0 ) THEN
+            WRITE(*,503) i, SQRT(EigenFreq(i))*FreqConversion(InternalUnits,InputUnits), FreqUnit(InputUnits), &
+                      TRIM(LengthUnit(InternalUnits)), EigenModes(:,i)
+         ELSE
+            WRITE(*,504) i, SQRT(-EigenFreq(i))*FreqConversion(InternalUnits,InputUnits), FreqUnit(InputUnits), &
+                      TRIM(LengthUnit(InternalUnits)), EigenModes(:,i)
+         END IF
+      END DO      
+      
       501 FORMAT( " * ",A5,23X,1F15.6,1X,A )
       502 FORMAT( " * Energy",22X,1F15.6,1X,A )
       503 FORMAT( " Normal Mode ",I5," - real frequency: ",1F15.2,1X,A, /, &
@@ -505,28 +550,31 @@ MODULE PotentialAnalysis
       REAL, DIMENSION(size(X)) :: NormalizedForces
       REAL :: VectorNorm
 
-      VectorNorm = SQRT(TheOneWithVectorDotVector( ConstrainedVector(Forces,Mask), &
-                     ConstrainedVector(Forces,Mask) ))
+      VectorNorm = SQRT(TheOneWithVectorDotVector( ConstrainedVector(Forces,Mask,COUNT(Mask)), &
+                     ConstrainedVector(Forces,Mask,COUNT(Mask)) ))
       NormalizedForces(:) = Forces(:) / VectorNorm
       NormalizedForces(:) = NormalizedForces(:) / SQRT(MassVector(:))
    END FUNCTION NormalizedForces
 
-   FUNCTION ConstrainedVector( Vector, Mask )
-      IMPLICIT NONE
-      REAL, DIMENSION(:), INTENT(IN) :: Vector
-      LOGICAL, DIMENSION(SIZE(Vector)), INTENT(IN) :: Mask
-      REAL, DIMENSION(COUNT(Mask)) :: ConstrainedVector
-      INTEGER :: i, n
+      FUNCTION ConstrainedVector( Vector, Mask, NMask )
+         IMPLICIT NONE
+         REAL, DIMENSION(:), INTENT(IN) :: Vector
+         LOGICAL, DIMENSION(SIZE(Vector)), INTENT(IN) :: Mask
+         INTEGER, INTENT(IN) :: NMask
+         REAL, DIMENSION(NMask) :: ConstrainedVector
+         INTEGER :: i, n
 
-      n = 0
-      DO i = 1, size(Vector)
-         IF ( Mask(i) ) THEN
-            n = n + 1
-            ConstrainedVector(n) = Vector(i)
-         END IF
-      END DO
+         CALL ERROR( NMask /= COUNT(Mask), &
+            " PotentialModule.ConstrainedVector: wrong input dimension" )
          
-   END FUNCTION ConstrainedVector
+         n = 0
+         DO i = 1, size(Vector)
+            IF ( Mask(i) ) THEN
+               n = n + 1
+               ConstrainedVector(n) = Vector(i)
+            END IF
+         END DO
+      END FUNCTION ConstrainedVector
 
 !===============================================================================================================================
 
