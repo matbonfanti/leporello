@@ -69,6 +69,7 @@ MODULE ScatteringSimulation
    TYPE(Evolution),SAVE :: Equilibration         !< Propagate in macrocanonical ensamble at given T to generate init conditions
 
    ! Averages computed during propagation
+   INTEGER  :: NrEnAverages                                     !< nr of average values which are computed and stored
    REAL, DIMENSION(:,:,:), ALLOCATABLE    :: TrajOutcome        !< prob of the different channels vs time and impact parameter
    REAL, DIMENSION(:,:,:,:), ALLOCATABLE  :: EnergyAver         !< energy average values
 
@@ -253,9 +254,12 @@ MODULE ScatteringSimulation
 
       ! ALLOCATE AND INITIALIZE DATA WITH THE AVERAGES OVER THE SET OF TRAJECTORIES
 
+      ! Define the number of average values to be stored
+      NrEnAverages = NSys+1+3+1+3  ! NSys+1 kin en, 3 pot en and 3 pot partitions
+      
       ! Allocate and initialize the variables for the trajectory averages
       IF ( PrintType >= FULL ) THEN 
-         ALLOCATE( EnergyAver(NSys+1+3+1+3,0:GetNrChannels()-1,0:NRhoMax,NrOfPrintSteps) )
+         ALLOCATE( EnergyAver(NrEnAverages,0:GetNrChannels()-1,0:NRhoMax,NrOfPrintSteps) )
          EnergyAver = 0.0
       END IF
       
@@ -288,7 +292,7 @@ MODULE ScatteringSimulation
       REAL     ::  ImpactPar, Time, CrossSection
       REAL     ::  TotEnergy, PotEnergy, KinEnergy, KinScatter, KinSubstrate  ! Energy values
       REAL     ::  TempAverage, TempVariance, IstTemperature                  ! Temperature values
-      REAL, DIMENSION(NSys+1+3+1+3) :: EnergyExpect                           ! Array to store energy values
+      REAL, DIMENSION(NrEnAverages) :: EnergyExpect                           ! Array to store energy values
       ! arrays to store grids useful for results output
       REAL, DIMENSION(NRhoMax+1) :: ImpactParameterGrid
       REAL, DIMENSION(NrOfPrintSteps) :: TimeGrid
@@ -598,7 +602,7 @@ MODULE ScatteringSimulation
                " | K_sub(NSys), K_bath, V_sub, V_bath, V_coup, V_part(...) / " // TRIM(EnergyUnit(InputUnits))
             ! Loop over the impact parameter (section per each impact values are appended one after the other)
             DO jRho = 0, NRhoMax
-               WRITE(EnergyAverUnit,"(A,F15.6,A/)")  "# Impact parameters ",ImpactParameterGrid(jRho),LengthUnit(InputUnits)
+               WRITE(EnergyAverUnit,"(A,F15.6,A/)")  "# Impact parameters ",ImpactParameterGrid(jRho+1),LengthUnit(InputUnits)
                DO iStep= 1, NrOfPrintSteps
                   WRITE(EnergyAverUnit,800) TimeGrid(iStep), &
                      EnergyAver(:,iChan,jRho,iStep)*EnergyConversion(InternalUnits,InputUnits)
@@ -733,7 +737,7 @@ MODULE ScatteringSimulation
 !**************************************************************************************
    FUNCTION ExpectationValues( X, V ) RESULT( Expectations )
       IMPLICIT NONE
-      REAL, DIMENSION(NSys+1+3+1+3) :: Expectations   ! NSys+1 kin e, 3 pot e and 3 pot partitions
+      REAL, DIMENSION(NrEnAverages) :: Expectations   
       REAL, DIMENSION(:), TARGET, INTENT(IN)  :: X
       REAL, DIMENSION(:), TARGET, INTENT(IN)  :: V
 
