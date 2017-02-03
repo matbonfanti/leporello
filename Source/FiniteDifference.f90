@@ -9,6 +9,8 @@
 !>             2) GetHessian  compute hessian matrix from potential
 !>             3) GetHessianFromForces computes Hessian matrix as 
 !>                  first derivatives of the analytic forces
+!>             4) TestForces  test implemented analytic forces by 
+!>                  comparing them with finite difference ones
 !
 !******************************************************************************
 !
@@ -33,10 +35,12 @@
 
 MODULE FiniteDifference
 #include "preprocessoptions.cpp"
+   USE RandomNumberGenerator
    IMPLICIT NONE
-   
+
       PRIVATE
       PUBLIC :: GetGradient, GetHessian, GetHessianFromForces
+      PUBLIC :: TestAnalyticForces
 
       ! Finite difference - 4 points formula for first derivative
       !> Displacements in units of delta for 4pts first derivative formula
@@ -44,6 +48,12 @@ MODULE FiniteDifference
       !> Coefficients for 4pts first derivative formula
       REAL, DIMENSION(4), PARAMETER :: CoeffsI = (/ +1./12., -8./12., +8./12., -1./12. /) 
       
+      ! Finite difference - 6 points formula for first derivative
+      !> Displacements in units of delta for 6pts first derivative formula
+!       REAL, DIMENSION(6), PARAMETER :: DeltasI = (/ -3.0,    -2.0,    -1.0,    +1.0,     +2.0,    +3.0  /)
+      !> Coefficients for 6pts first derivative formula
+!       REAL, DIMENSION(6), PARAMETER :: CoeffsI = (/ -1./60., 3./20.,  -3./4.,  3./4., -3./20.,   1./60. /) 
+
       ! Finite difference - 9 points formula for second derivative
       !> Displacements in units of delta for 9pts second derivative formula
       REAL, DIMENSION(9), PARAMETER :: DeltasII = &
@@ -57,6 +67,9 @@ MODULE FiniteDifference
       ! Default value for delta for numerical second derivatives
       REAL, PARAMETER :: SmallDeltaII = 0.005
 
+      !> Number of random generated points for the derivative testing
+      INTEGER, PARAMETER :: NPointsTest = 10.**3
+      
 #if defined(LOG_FILE)
     CHARACTER(17), SAVE :: LogStr = " FiniteDifference |"
 #endif
@@ -269,6 +282,113 @@ FUNCTION GetGradient( AtPoint, GetPotential, DeltaInp ) RESULT( Grad )
 !       CALL TheOneWithMatrixPrintedLineAfterLine( SecDeriv )
 
    END FUNCTION GetHessianFromForces
+
+!==============================================================================
+
+
+!******************************************************************************
+!> Subroutine to test the computation of the forces by comparing
+!> analytically and numerically (finite difference) derivatives
+!> Points are sampled randomly (uniform distribution) in the interval 
+!> between the values defined by CoordMin and CoordMax
+!>
+!> @param GetPotential  Function to evaluate the potential and forces
+!> @param CoordMin      Array with the NDim min values of the coordinates
+!> @param CoordMax      Array with the NDim max values of the coordinates
+!*******************************************************************************
+   SUBROUTINE TestAnalyticForces( GetPotAndForces, CoordMin, CoordMax, DeltaInp ) 
+      IMPLICIT NONE
+      REAL, DIMENSION(:), INTENT(IN) :: CoordMin, CoordMax
+      REAL, OPTIONAL, INTENT(IN)     :: DeltaInp
+
+      INTERFACE
+         REAL FUNCTION GetPotAndForces( X, Force )
+            REAL, DIMENSION(:), INTENT(IN)  :: X
+            REAL, DIMENSION(:), INTENT(OUT) :: Force
+         END FUNCTION GetPotAndForces
+      END INTERFACE
+
+      TYPE(RNGInternalState) :: Random
+
+      REAL, DIMENSION(size(CoordMin))  :: AtPoint, Coordinates, AnalyticalDerivs, NumericalDerivs
+      REAL, DIMENSION(size(CoordMin))  :: Average, Deviation, Dummy
+      REAL    :: V, SmallDelta
+      INTEGER :: iPnt, iCoord, iDispl, NSelected, NDim
+
+      ! Define the displacement length
+      IF (PRESENT(DeltaInp)) THEN
+         SmallDelta = DeltaInp
+      ELSE
+         SmallDelta = SmallDeltaI
+      ENDIF
+
+      ! Check the number of degree of freedom
+      NDim = size(CoordMin)
+      CALL ERROR( size(CoordMax) /= NDim, "PotentialModule.TestForces: array dimension mismatch" )
+
+      ! Initialize random number generator
+      CALL SetSeed( Random, -512 )
+
+      Average = 0.0; Deviation = 0.0
+      NSelected = 0
+      DO iPnt = 1, NPointsTest
+            
+         ! generate random numbers for the coordinates
+         DO iCoord = 1, NDim 
+            AtPoint(iCoord) = CoordMin(iCoord) + (CoordMax(iCoord) - CoordMin(iCoord)) * UniformRandomNr(Random)
+         END DO
+         ! Compute analytical derivatives
+         V = GetPotAndForces( AtPoint, AnalyticalDerivs )
+
+         IF ( V < 0.5 ) THEN
+            NSelected = NSelected + 1
+            ! Compute numerical derivatives
+            NumericalDerivs(:) = 0.0
+            DO iCoord = 1, NDim 
+               DO iDispl = 1, size(DeltasI)
+                  ! Define small displacement from the point where compute the derivative
+                  Coordinates(:) = AtPoint(:)
+                  Coordinates(iCoord) = Coordinates(iCoord) + DeltasI(iDispl)*SmallDelta
+                  ! Compute potential in the displaced coordinate
+                  V = GetPotAndForces( Coordinates, Dummy )
+                  ! Increment numerical derivative
+                  NumericalDerivs(iCoord) = NumericalDerivs(iCoord) + CoeffsI(iDispl)*V
+               END DO
+            END DO
+            NumericalDerivs(:) = NumericalDerivs(:) / SmallDelta
+
+            ! Accumulate to compute average and root mean squared deviations
+            Average = Average + ( NumericalDerivs - AnalyticalDerivs )
+            Deviation = Deviation + ( NumericalDerivs - AnalyticalDerivs )**2
+         END IF
+      END DO
+
+      ! Normalize averages
+      Average = Average / NSelected
+      Deviation = SQRT(Deviation / NSelected)
+
+      ! Print results to screen
+      PRINT "(2/,A)",    " ***************************************************"
+      PRINT "(A,F10.5)", "           TESTING POTENTIAL DERIVATIVES"
+      PRINT "(A,/)" ,    " ***************************************************"
+
+      WRITE(*,300) NPointsTest
+      WRITE(*,302) NSelected
+         
+      DO iCoord = 1, NDim 
+         WRITE(*,301) iCoord, CoordMin(iCoord), CoordMax(iCoord), Average(iCoord), Deviation(iCoord)
+      END DO
+
+      300 FORMAT(" * Number of points where dV's are evaluated:   ",I10 )
+      302 FORMAT(" * Number of points kept for the averages:      ",I10,2/)
+      301 FORMAT(" * Coordinate ",I3,/,&
+                  "      min for the sampling:                     "F10.4,1X,A,/,& 
+                  "      max for the sampling:                     "F10.4,1X,A,/,& 
+                  "      average deviation:                        "F10.4,1X,A,/,& 
+                  "      RMS deviation:                            "F10.4,1X,A,2/ )
+
+   END SUBROUTINE TestAnalyticForces
+
 
 !==============================================================================
 !                              END OF MODULE

@@ -534,7 +534,7 @@ ${OBJDIR}/InputField.o : ${SRCDIR}/InputField.f90 ${COMMONDEP}
 ${OBJDIR}/FFTWrapper.o : ${SRCDIR}/FFTWrapper.f90 ${COMMONDEP}
 
 # Compute derivatives with finite difference
-${OBJDIR}/FiniteDifference.o : ${SRCDIR}/FiniteDifference.f90 ${COMMONDEP}
+${OBJDIR}/FiniteDifference.o : ${SRCDIR}/FiniteDifference.f90 ${OBJDIR}/RandomNumberGenerator.o ${COMMONDEP}
 
 # Module containing the spline interpolation subroutines
 ${OBJDIR}/SplineInterpolator.o : ${SRCDIR}/SplineInterpolator.f90 ${OBJDIR}/NRUtility.o Makefile
