@@ -338,7 +338,7 @@ MODULE MyLinearAlgebra
 !*******************************************************************************
 !          TheOneWithSymmetricLinearSystem
 !*******************************************************************************
-!> Sub giving back the solution of the system of linear equations A * X = B
+!> Function giving back the solution of the system of linear equations A * X = B
 !> with A being the nxn symmetric positive definite matrix and B being a n vector
 !> This code is a wrapper to linear algebra libraries:
 !> \arg Lapack routines Xpotrf and Xpotrs which factorize the symmetrix positive
@@ -346,28 +346,37 @@ MODULE MyLinearAlgebra
 !>   see  http://www.netlib.org/lapack/lug/node38.html
 !>   
 !> @param      Matrix     NxN array with the matrix A
-!> @param      Vector     N array with the vector B, on out the solution of the system
+!> @param      Vector     N array with the vector B 
+!> @returns    Solution   N array with the solution of the linear system
 !*******************************************************************************
-   SUBROUTINE TheOneWithSymmetricLinearSystem( Matrix, Vector )
+   FUNCTION TheOneWithSymmetricLinearSystem( Matrix, Vector ) RESULT( Solution )
       IMPLICIT NONE
-      REAL, DIMENSION(:), INTENT(INOUT)                          :: Vector
-      REAL, DIMENSION(size(Vector),size(Vector)), INTENT(INOUT)  :: Matrix
+      REAL, DIMENSION(:), INTENT(IN)                          :: Vector
+      REAL, DIMENSION(size(Vector),size(Vector)), INTENT(IN)  :: Matrix
+      REAL, DIMENSION(size(Vector))                           :: Solution
+
 #if defined(WITH_LAPACK)
+      REAL, DIMENSION(size(Vector),size(Vector))    :: Mat
       INTEGER( SHORT_INTEGER_KIND )                 :: DimShort, Stat
       CHARACTER(200)                                :: ErrMsg
 #endif
       
 #if defined(WITH_LAPACK)
+
+      ! Make a copy of the input matrix
+      Mat = Matrix
       ! Define the dimension in a lapack compatible integer kind
       DimShort = size(Vector)
       Stat = 0
+      ! Initialize the solution
+      Solution = Vector
 
       ! xPOTRF computes the Cholesky factorization of a real symmetric positive definite matrix A
 
-      IF ( KIND( Matrix(1,1) ) == SINGLE_PRECISION_KIND ) THEN
-            CALL SPOTRF( "U", DimShort, Matrix, DimShort, Stat ) 
-      ELSE IF ( KIND( Matrix(1,1) ) == DOUBLE_PRECISION_KIND ) THEN
-            CALL DPOTRF( "U", DimShort, Matrix, DimShort, Stat ) 
+      IF ( KIND( Mat(1,1) ) == SINGLE_PRECISION_KIND ) THEN
+            CALL SPOTRF( "U", DimShort, Mat, DimShort, Stat ) 
+      ELSE IF ( KIND( Mat(1,1) ) == DOUBLE_PRECISION_KIND ) THEN
+            CALL DPOTRF( "U", DimShort, Mat, DimShort, Stat ) 
       END IF
 
       IF ( Stat < 0 ) THEN
@@ -382,10 +391,10 @@ MODULE MyLinearAlgebra
       ! DPOTRS - solve a system of linear equations A*X = B with a symmetric positive definite matrix A using the Cholesky 
       !          factorization A = U**T*U or A =  L*L**T computed by DPOTRF
 
-      IF ( KIND( Matrix(1,1) ) == SINGLE_PRECISION_KIND ) THEN
-            CALL SPOTRS( "U", DimShort, 1, Matrix, DimShort, Vector, DimShort, Stat  )
-      ELSE IF ( KIND( Matrix(1,1) ) == DOUBLE_PRECISION_KIND ) THEN
-            CALL DPOTRS( "U", DimShort, 1, Matrix, DimShort, Vector, DimShort, Stat )
+      IF ( KIND( Mat(1,1) ) == SINGLE_PRECISION_KIND ) THEN
+            CALL SPOTRS( "U", DimShort, 1, Mat, DimShort, Solution, DimShort, Stat  )
+      ELSE IF ( KIND( Mat(1,1) ) == DOUBLE_PRECISION_KIND ) THEN
+            CALL DPOTRS( "U", DimShort, 1, Mat, DimShort, Solution, DimShort, Stat )
       END IF
 
       IF ( Stat < 0 ) THEN
@@ -398,7 +407,7 @@ MODULE MyLinearAlgebra
       CALL AbortWithError( " TheOneWithSymmetricLinearSystem: linear system solution implemented only with LAPACK ")
 #endif
 
-   END SUBROUTINE TheOneWithSymmetricLinearSystem
+   END FUNCTION TheOneWithSymmetricLinearSystem
 
 
 !*******************************************************************************

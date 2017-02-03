@@ -107,7 +107,11 @@ MODULE MyConsts
 
    !> Wrapper for the unique elements extraction subroutine
    INTERFACE RemoveDups 
-      MODULE PROCEDURE RemoveDups1D_r, RemoveDups2D_r
+      MODULE PROCEDURE RemoveDups1D_r, RemoveDups2D_r, RemoveDups1D_i
+   END INTERFACE
+
+   INTERFACE Sort 
+      MODULE PROCEDURE Sort_r, Sort_i
    END INTERFACE
 
 
@@ -158,6 +162,7 @@ CONTAINS
                                       "PrintTools: No free I/O unit available")
    END FUNCTION LookForFreeUnit
 
+   
 !*******************************************************************************
 ! NumberToString
 !*******************************************************************************
@@ -184,6 +189,7 @@ CONTAINS
       END SELECT
 
    END FUNCTION NumberToString
+   
    
 !*******************************************************************************
 ! CountLinesInFile
@@ -245,6 +251,31 @@ SUBROUTINE RemoveDups1D_r( InputArray, NrOfNonRepeated )
    InputArray(1:NrOfNonRepeated) = TmpArray(1:NrOfNonRepeated)
 
 END SUBROUTINE RemoveDups1D_r
+
+SUBROUTINE RemoveDups1D_i( InputArray, NrOfNonRepeated )
+   IMPLICIT NONE
+   INTEGER, DIMENSION(:), INTENT(INOUT)  ::   InputArray
+   INTEGER, INTENT(OUT)                  ::   NrOfNonRepeated
+   
+   INTEGER, DIMENSION(SIZE(InputArray))  ::   TmpArray
+   INTEGER :: i, j 
+
+   NrOfNonRepeated = 1
+   TmpArray(1) = InputArray(1)
+   Outer: DO i = 2, Size(InputArray)
+      DO j = 1, NrOfNonRepeated
+         IF ( TmpArray(j) == InputArray(i) )   CYCLE Outer
+      END DO
+      ! No match is found, so new element is added to non repeated array
+      NrOfNonRepeated = NrOfNonRepeated + 1
+      TmpArray( NrOfNonRepeated ) = InputArray(i)
+   END DO Outer
+
+   ! Store in InputArray the non repeated elements
+   CALL Sort( TmpArray(1:NrOfNonRepeated) )
+   InputArray(1:NrOfNonRepeated) = TmpArray(1:NrOfNonRepeated)
+
+END SUBROUTINE RemoveDups1D_i
 
 SUBROUTINE RemoveDups2D_r( InputArray, NrOfNonRepeated )
    IMPLICIT NONE
@@ -314,7 +345,7 @@ END SUBROUTINE RemoveDups2D_r
 !    This subroutine receives an array x() and sorts it into ascending
 ! order.
 ! --------------------------------------------------------------------
-   SUBROUTINE  Sort(x)
+   SUBROUTINE  Sort_r(x)
       IMPLICIT  NONE
       REAL, DIMENSION(:), INTENT(INOUT) :: x
       INTEGER    :: i,  Location
@@ -332,8 +363,27 @@ END SUBROUTINE RemoveDups2D_r
       END DO
       DEALLOCATE(Mask)
 
-   END SUBROUTINE  Sort
+   END SUBROUTINE  Sort_r
 
+   SUBROUTINE  Sort_i(x)
+      IMPLICIT  NONE
+      INTEGER, DIMENSION(:), INTENT(INOUT) :: x
+      INTEGER    :: i,  Location
+      INTEGER    :: Temp
+      LOGICAL, DIMENSION(:), ALLOCATABLE :: Mask
+
+      ALLOCATE(Mask(SIZE(x)))
+      Mask = .TRUE.
+      DO i = 1, SIZE(x)-1                  ! except for the last
+         Location = MINLOC( x, 1, Mask )    ! find min from this to last
+         Temp = x(i)
+         x(i) = x(Location)
+         x(Location) = Temp
+         Mask(i) = .FALSE.
+      END DO
+      DEALLOCATE(Mask)
+
+   END SUBROUTINE  Sort_i
 ! --------------------------------------------------------------------
 !>  SUBROUTINE  Order():
 !>  This subroutine receives an array x() and gives an integer array
@@ -357,5 +407,7 @@ END SUBROUTINE RemoveDups2D_r
    END FUNCTION  Order
 
 END MODULE MyConsts
+
+
 
 !********************************************* END OF FILE *******************************
