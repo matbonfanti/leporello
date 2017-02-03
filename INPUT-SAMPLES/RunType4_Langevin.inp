@@ -11,7 +11,7 @@ RunType : 4
 # 3 - DEBUG fully detailed information about each traj
 # 2 - FULL files to plot the averages over the ensamble
 # 1 - MINIMAL minimal level of output, only final averages
-PrintType : 1
+PrintType : 2
 
 # BATHTYPE
 # 1 - LANGEVIN DYNAMICS - effective relaxation dynamics, with langevin eq of motion
@@ -41,9 +41,9 @@ RelaxAtCarbon : 0.
 
 # Scattering parameters
 # Kinetic energy of the H atom (normal incidence)
-InitEKin : 0.5
+InitEKin : 1.0
 # Initial height of the H atom
-InitDistance : 6.0
+InitDistance : 16.0
 
 # Evolution parameters
 # Step of the time evolution 
@@ -76,11 +76,11 @@ ZPECorrection : FALSE
 
 # Sampling parameters
 # number of trajectories per impact parameter
-NrTrajs   : 1000
+NrTrajs   : 1
 
 # limiting conditions on the carbon atom (aka sudden and adiab approx)
 SuddenV : FALSE
-AdiabaticV : TRUE 
+AdiabaticV : FALSE
 
 
 # -------------------------------- END OF INPUT FILE -------------------------------------
