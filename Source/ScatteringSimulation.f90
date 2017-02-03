@@ -32,6 +32,8 @@ MODULE ScatteringSimulation
    USE IndependentOscillatorsModel
    USE RandomNumberGenerator
    USE PrintTools
+   USE FiniteDifference
+   USE Optimize
 
    IMPLICIT NONE
 
@@ -342,50 +344,30 @@ MODULE ScatteringSimulation
             ! INITIALIZATION OF THE COORDINATES AND MOMENTA OF THE SYSTEM
             !*************************************************************
 
-            ! Put zero point energy in each oscillator of the bath and in the carbon
-            IF ( ZPECorrection ) THEN
+            ! Set initial conditions for the system
+            ! in normal modes: classical sampling of maxwell-boltzmann or 
+            ! microcanonical ensable at zero point energy
+            CALL SubstrateInitialConditions( X(1:NDim), V(1:NDim) )
 
-               ! Set initial coordinates for the system (task = 3 for quasi-classical simulations
-               CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), InitDistance, &
-                       InitEKin, ImpactPar, Temperature, RandomNr, task = 3 )
-               ! Set initial conditions of the bath
-               IF ( BathType == NORMAL_BATH .OR. BathType == CHAIN_BATH ) &
-                  CALL ZeroKelvinBathConditions( Bath, X(NSys+1:), V(NSys+1:), ZPECorrection, RandomNr )
+            ! Compute starting potential and forces
+            A(:) = 0.0
+            PotEnergy = ScatteringPotential( X, A )
+            A(:) = A(:) / MassVector(:)
 
-               ! Compute starting potential and forces
-               A(:) = 0.0
-               PotEnergy = ScatteringPotential( X, A )
-               A(:) = A(:) / MassVector(:)
+            ! compute kinetic energy and total energy
+            KinEnergy = EOM_KineticEnergy(Equilibration, V )
+            TotEnergy = PotEnergy + KinEnergy
+            IstTemperature = 2.0*KinEnergy/(NDim-1)
 
-               ! compute kinetic energy and total energy
-               KinEnergy = EOM_KineticEnergy(Equilibration, V )
-               TotEnergy = PotEnergy + KinEnergy
-               IstTemperature = 2.0*KinEnergy/NDim
-
-            ELSE  ! Thermalize bath + carbon
-
-               ! Set initial coordinates for the equilibration of the system, task = 1 fix the scatterer at asymptotic geom
-               CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), InitDistance, &
-                       InitEKin, ImpactPar, Temperature, RandomNr, task = 1 )
-               ! Set initial conditions of the bath
-               IF ( BathType == NORMAL_BATH .OR. BathType == CHAIN_BATH ) &
-                  CALL ThermalEquilibriumBathConditions( Bath, X(NSys+1:), V(NSys+1:), Temperature, RandomNr )
+            WRITE(200,*) iTraj, TotEnergy
+            ! When the initial conditions are classical, do a Langevin equilibration
+            IF ( .NOT. ZPECorrection ) THEN
 
                PRINT "(/,A,F6.1,1X,A)",   " Equilibrating the initial conditions at T = ", &
                    Temperature*TemperatureConversion(InternalUnits,InputUnits), TemperUnit(InputUnits)
 
                ! Initialize temperature average and variance
                TempAverage = 0.0; TempVariance = 0.0
-
-               ! Compute starting potential and forces
-               A(:) = 0.0
-               PotEnergy = ScatteringPotential( X, A )
-               A(:) = A(:) / MassVector(:)
-
-               ! compute kinetic energy and total energy
-               KinEnergy = EOM_KineticEnergy(Equilibration, V )
-               TotEnergy = PotEnergy + KinEnergy
-               IstTemperature = 2.0*KinEnergy/(size(X)-1)
 
                ! Do an equilibration run
                EquilibrationCycle: DO iStep = 1, NrEquilibSteps
@@ -398,7 +380,7 @@ MODULE ScatteringSimulation
                   ! compute kinetic energy and total energy
                   KinEnergy = EOM_KineticEnergy(Equilibration, V )
                   TotEnergy = PotEnergy + KinEnergy
-                  IstTemperature = 2.0*KinEnergy/(size(X)-1)
+                  IstTemperature = 2.0*KinEnergy/(NDim-1)
 
                   ! store temperature average and variance
                   TempAverage = TempAverage + IstTemperature
@@ -424,11 +406,11 @@ MODULE ScatteringSimulation
                WRITE(*,500)  TempAverage*TemperatureConversion(InternalUnits,InputUnits), TemperUnit(InputUnits), &
                              sqrt(TempVariance)*TemperatureConversion(InternalUnits,InputUnits), TemperUnit(InputUnits)
 
-               ! Set initial coordinates for the scattering, task = 3 fix the scatterer at initial conditions
-               CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), InitDistance, &
-                       InitEKin, ImpactPar, Temperature, RandomNr, task = 2 )
-
             END IF
+
+            ! Set initial coordinates for the scattering, task = 2 fix the scatterer at initial conditions
+            CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), InitDistance, &
+                        InitEKin, ImpactPar, Temperature, RandomNr, task = 2 )
 
             !*************************************************************
             ! INFORMATION ON INITIAL CONDITIONS, INITIALIZATION, OTHER...
@@ -724,6 +706,58 @@ MODULE ScatteringSimulation
        END IF
 
    END FUNCTION ScatteringPotential
+   
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Compute the Hessian of the system-bath potential in mass square root scaled 
+!> coordinates as it is needed for the normal modes analysis  
+!>
+!> @param AtPoint   Input vector with the coordinates where to compute Hessian
+!> @returns         Hessian matrix of the potential in AtPoint
+!**************************************************************************************
+   FUNCTION GetMassScaledHessian( AtPoint ) RESULT( Hessian )
+      REAL, DIMENSION(NDim), INTENT(IN)  :: AtPoint
+      REAL, DIMENSION(NDim,NDim)         :: Hessian
+      
+      REAL, DIMENSION(NBath)   :: CouplingsCoeffs
+      REAL                     :: DistortionCoeff
+      INTEGER                  :: i,j
+
+      ! Initialize Hessian equal to 0 (necessary for 0 elements in system+bath matrix)
+      Hessian(:,:) = 0.0
+
+      ! Use subroutine GetHessianFromForces to compute the numerical hessian for the subsystem
+      Hessian(1:NSys,1:NSys) = GetHessianFromForces( AtPoint(1:NSys), GetPotAndForces, 1.E-3 ) 
+      ! and transform it to mass weighted coordinates
+      DO j = 1, NSys
+         DO i = 1, NSys
+            Hessian(i,j) = Hessian(i,j) / SQRT( MassVector(i)*MassVector(j) )
+         END DO
+      END DO
+      
+      IF ( BathType == NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
+         ! compute bath hessian, which is computed by the same subroutine, regardless bath type
+         CALL  HessianOfTheBath( Bath, Hessian(NSys+1:NDim, NSys+1:NDim) ) 
+         CALL  CouplingAndDistortionHessian( Bath, CouplingsCoeffs, DistortionCoeff )
+         
+         ! add the contribution from DISTORTION CORRECTION, equal in normal bath and chain bath 
+         Hessian(NCoupled,NCoupled) = Hessian(NCoupled,NCoupled) + DistortionCoeff / MassVector(NCoupled)
+      END IF
+      
+      ! Add contribution coming from COUPLING, which is different in Normal and Chain bath
+      IF ( BathType == NORMAL_BATH ) THEN
+         DO i = NSys+1, NDim
+            Hessian(NCoupled,i) = Hessian(NCoupled,i) + CouplingsCoeffs(i-NSys)/SQRT(MassVector(NCoupled)*MassVector(i) ) 
+            Hessian(i,NCoupled) = Hessian(i,NCoupled) + CouplingsCoeffs(i-NSys)/SQRT(MassVector(NCoupled)*MassVector(i) ) 
+         END DO
+      ELSE IF ( BathType == CHAIN_BATH ) THEN
+         Hessian(NCoupled,NSys+1) = Hessian(NCoupled,NSys+1) + CouplingsCoeffs(1)/SQRT(MassVector(NCoupled)*MassVector(NSys+1)) 
+         Hessian(NSys+1,NCoupled) = Hessian(NSys+1,NCoupled) + CouplingsCoeffs(1)/SQRT(MassVector(NCoupled)*MassVector(NSys+1)) 
+      END IF
+         
+   END FUNCTION GetMassScaledHessian
+   
 
 ! ===============================================================================================================================
 
@@ -780,4 +814,90 @@ MODULE ScatteringSimulation
       
    END FUNCTION ExpectationValues
 
+! ===============================================================================================================================
+
+!**************************************************************************************
+!> Setup initial condition for the bath and those degrees of freedom which are 
+!> not scattering coordinates. The scatterer is fixed far from the interaction
+!> region and can be subsequently fixed in conditions which are suitable for 
+!> relaxation or scattering. 
+!> The initial state can be chosen to be either a finite temperature classical 
+!> state or a quasi-classical T=0 K state.
+!>
+!> @param X              Output vector with the initial positions of the system
+!> @param V              Output vector with the initial Velocities of the system
+!**************************************************************************************
+   SUBROUTINE SubstrateInitialConditions( X, V )
+      IMPLICIT NONE
+      REAL, DIMENSION(:), INTENT(OUT)  :: X
+      REAL, DIMENSION(:), INTENT(OUT)  :: V
+
+      REAL, DIMENSION(size(X),size(X)) ::  Hessian, NormalModesVec
+      REAL, DIMENSION(size(X))         ::  NormalModesVal, XEquil
+      REAL                             ::  Value, CarbonFreq, SigmaV
+      INTEGER                          ::  i
+
+      ! Check the number degrees of freedom
+      CALL ERROR( size(X) /= NDim, "ScatteringSimulation.SubstrateInitialConditions: array dimension mismatch (1)" )
+      CALL ERROR( size(V) /= NDim, "ScatteringSimulation.SubstrateInitialConditions: array dimension mismatch (2)" )
+
+      ! Put initial scatterer asymptotically, and the rest of the degrees of freedom in a good guess for initial minimum
+      X(1) = 100.0000 / MyConsts_Bohr2Ang
+      X(2) = 1.4000 / MyConsts_Bohr2Ang                     ! NOTE: later these lines should be moved in an ad-hoc sub 
+      IF (NDim == 3) X(3) = 0.3000 / MyConsts_Bohr2Ang      ! of PotentialModule, since they depend on the system choice
+      IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
+         X(NSys+1:) = 0.0
+      END IF
+
+      ! Optimize the potential and find the position of the local minimum 
+      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3 )
+      XEquil(1) = 100.0000 / MyConsts_Bohr2Ang
+
+      ! compute the hessian in mass scaled coordinates
+      Hessian(:,:) = GetMassScaledHessian( XEquil ) 
+      ! and diagonalize it
+      CALL TheOneWithDiagonalization(Hessian, NormalModesVec, NormalModesVal)
+
+      DO i = 1, NDim            ! cycle over the coordinates
+         ! Set sigma of the maxwell boltzmann distribution
+         SigmaV = sqrt( Temperature )
+
+         ! the coordinate is bound
+         IF ( NormalModesVal(i) > 0. ) THEN
+            ! set frequency of the normal mode
+            CarbonFreq = SQRT( NormalModesVal(i) )
+
+            ! Quasiclassical distribution
+            IF ( ZPECorrection ) THEN
+               Value = UniformRandomNr( RandomNr )*2.0*MyConsts_PI
+               X(i) = COS(Value) / SQRT(CarbonFreq)
+               V(i) = SIN(Value) * SQRT(CarbonFreq)
+               
+            ! Classical distribution
+            ELSE IF ( .NOT. ZPECorrection ) THEN
+               X(i) = GaussianRandomNr(RandomNr) * SigmaV / CarbonFreq
+               V(i) = GaussianRandomNr(RandomNr) * SigmaV
+            END IF
+            
+         ELSE
+            ! unbound coordinate (set velocity according to maxwell-boltzman) 
+            X(i) = X(i)
+            V(i) = 0.0 !GaussianRandomNr(RandomNr) * SigmaV
+
+         ENDIF
+         
+      END DO
+
+      ! TRASFORM BACK TO ORIGINAL FRAME AND TO NOT-MASS-WEIGHTED COORDINATES
+      X = TheOneWithMatrixVectorProduct( NormalModesVec, X )
+      V = TheOneWithMatrixVectorProduct( NormalModesVec, V )
+      DO i = 1, NDim
+         X(i) = X(i) / SQRT( MassVector(i) )
+         V(i) = V(i) / SQRT( MassVector(i) )
+      END DO
+      X = X + XEquil
+      
+   END SUBROUTINE SubstrateInitialConditions
+   
+      
 END MODULE ScatteringSimulation

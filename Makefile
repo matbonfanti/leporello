@@ -486,7 +486,8 @@ COMMONDEP = Makefile ${OBJDIR}/ErrorTrap.o  ${OBJDIR}/MyConsts.o ${OBJDIR}/MyLin
 # Program to simulate the scattering process
 ${OBJDIR}/ScatteringSimulation.o : ${SRCDIR}/ScatteringSimulation.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o ${OBJDIR}/UnitConversion.o  \
 				${OBJDIR}/ClassicalEqMotion.o ${OBJDIR}/PotentialModule.o ${OBJDIR}/IndependentOscillatorsModel.o               \
-				${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/PrintTools.o ${COMMONDEP}                                           \
+				${OBJDIR}/RandomNumberGenerator.o ${OBJDIR}/PrintTools.o ${OBJDIR}/FiniteDifference.o           \
+				${OBJDIR}/Optimize.o ${COMMONDEP}
 
 # Program to simulate the vibrational relaxation
 #${OBJDIR}/Harmonic1DModel.o : ${SRCDIR}/Harmonic1DModel.f90 ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                         \
