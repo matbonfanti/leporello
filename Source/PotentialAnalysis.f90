@@ -29,6 +29,7 @@ MODULE PotentialAnalysis
    USE PotentialModule
    USE PrintTools
    USE FiniteDifference
+   USE Optimize
 
    IMPLICIT NONE
 
@@ -46,7 +47,8 @@ MODULE PotentialAnalysis
    ! Parameters for optimizations
    INTEGER :: MaxOptSteps  !< Maximum number of steps for optimizations
    REAL :: OptThreshold    !< Convergence criterium for optimizations
-
+   REAL :: DeltaFiniteDiff !< Magnitude of the displacement used to compute hessian
+   
    ! Parameters for Minimum Energy Path computation
    INTEGER :: MaxMEPNrSteps      !< Max number of MEP steps
    INTEGER :: PrintMEPNrSteps    !< Max number of MEP steps printed to file output
@@ -90,7 +92,9 @@ MODULE PotentialAnalysis
       CALL SetFieldFromInput( InputData, "MaxOptSteps", MaxOptSteps, 10**6 )
       CALL SetFieldFromInput( InputData, "OptThreshold", OptThreshold, 1.E-6 )
       OptThreshold = OptThreshold * ForceConversion(InputUnits, InternalUnits)
-      
+      CALL SetFieldFromInput( InputData, "DeltaFiniteDiff", DeltaFiniteDiff, 1.E-5 )
+      DeltaFiniteDiff = DeltaFiniteDiff * LengthConversion(InputUnits, InternalUnits)
+
       ! Set variables for Minimum Energy Path computation
       CALL SetFieldFromInput( InputData, "MaxMEPNrSteps", MaxMEPNrSteps, 1000 )
       CALL SetFieldFromInput( InputData, "MEPStep", MEPStep, 0.001 )
@@ -268,7 +272,7 @@ MODULE PotentialAnalysis
       LogMask(:) = .TRUE.
       LogMask(1) = .FALSE.
       
-      XStart = NewtonLocator( X, MaxOptSteps, OptThreshold, 1.0, LogMask )
+      XStart = NewtonLocator( GetPotAndForces, X, MaxOptSteps, OptThreshold, 1.0, DeltaFiniteDiff, LogMask )
       ! Computing the energy at this geometry
       EStart = GetPotAndForces( XStart, A )
 
@@ -399,7 +403,7 @@ MODULE PotentialAnalysis
 
       ! Find minimum by Newton's optimization
       LogMask(:) = .TRUE.
-      X = NewtonLocator( X, MaxOptSteps, OptThreshold, 1.0, LogMask )
+      X = NewtonLocator( GetPotAndForces, X, MaxOptSteps, OptThreshold, 1.0, DeltaFiniteDiff, LogMask )
       ! Computing the energy at this geometry
       E = GetPotAndForces( X, A )
 
@@ -476,7 +480,7 @@ MODULE PotentialAnalysis
          CALL ERROR( size(AtPoint) /= NDim, "PotentialModule.GetMassScaledHessian: input array dimension mismatch" )
 
          ! Use subroutine GetHessianFromForces to compute the matrix of the 2nd derivatives
-         Hessian(:,:) = GetHessianFromForces( AtPoint, GetPotAndForces, 0.00001 ) 
+         Hessian(:,:) = GetHessianFromForces( AtPoint, GetPotAndForces, DeltaFiniteDiff ) 
          ! Numerical hessian of the potential in mass weighted coordinates
          DO j = 1, NDim
             DO i = 1, NDim
