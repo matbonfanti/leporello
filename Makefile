@@ -13,16 +13,16 @@ LOGFILE = yes
 LOGNAME = leporello.log
 
 # Compiler ( gfortran, ifort )
-FC = galileo
+FC = ifort
 
 # Debugging options ( yes or no )
-DEBUG =  no 
+DEBUG =  yes 
 
 # Optimization level
 OPTLEVEL = 3
 
 # linking FFTW 3.3
-FFTW3 = yes
+FFTW3 = no 
 
 # OpenMP libraries
 OPENMP = no 
@@ -38,11 +38,12 @@ REAL8 = yes
 #----------------------------------------------------------------------------
 
 # Intel compiler version ( used only if FC=ifort and LAPACK=yes )
+# 2016-SEQ, 2016-MULTI      -   2016 version, sequential / multithreaded 
 # 2013-SEQ, 2013-MULTI      -   2013 version, sequential / multithreaded 
 # 11-SEQ,   11-MULTI        -   11.x version, sequential / multithreaded 
 # 11-IA32                   -   11.x ia32 arch version, sequential  
 # 10-SEQ,   10-MULTI        -   10.x version, sequential / multithreaded 
-INTELVERS = 2013-MULTI
+INTELVERS = 2016-SEQ
 
 # gfortran lapack libraries
 # GNU      - system default libraries 
@@ -121,6 +122,14 @@ ifeq (${FC},ifort)
    DEBUGFLG  =  -g -traceback -fpe-all=0 -debug all -check all 
 
    # MKL flags
+   ifeq (${INTELVERS},2016-SEQ)
+      LAPACKFLG = -lpthread -lm
+      LAPACKCOMPILE = -mkl=sequential
+   endif
+   ifeq (${INTELVERS},2016-MULTI)
+      LAPACKFLG = -lpthread -lm
+      LAPACKCOMPILE = -qopenmp -mkl=parallel
+   endif
    ifeq (${INTELVERS},2013-SEQ)
       LAPACKFLG = -lpthread -lm
       LAPACKCOMPILE = -mkl=sequential
@@ -155,7 +164,7 @@ ifeq (${FC},ifort)
    FFTW3COMPILE = -I/data/local/fftw3/include/ 
 
    # OPENMP flags
-   OPENMPFLG = -openmp
+   OPENMPFLG = -qopenmp
 
    # Data type
    DATAFLG =
