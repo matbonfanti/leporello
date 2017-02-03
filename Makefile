@@ -495,7 +495,7 @@ ${OBJDIR}/ScatteringSimulation.o : ${SRCDIR}/ScatteringSimulation.f90 ${OBJDIR}/
 
 # Program to compute the properties of the PES
 ${OBJDIR}/PotentialAnalysis.o : ${SRCDIR}/PotentialAnalysis.f90  ${OBJDIR}/SharedData.o ${OBJDIR}/InputField.o                     \
-				${OBJDIR}/UnitConversion.o ${OBJDIR}/PotentialModule.o                                             \
+				${OBJDIR}/UnitConversion.o ${OBJDIR}/PotentialModule.o  ${OBJDIR}/FiniteDifference.o               \
 				${OBJDIR}/PrintTools.o  ${COMMONDEP}
 
 # Program to compute the minimum energy path of the PES
@@ -513,7 +513,7 @@ ${OBJDIR}/ClassicalEqMotion.o  : ${SRCDIR}/ClassicalEqMotion.f90 ${OBJDIR}/Rando
 
 # Module containing the potential energy surface
 ${OBJDIR}/PotentialModule.o  : ${SRCDIR}/PotentialModule.f90 ${OBJDIR}/vEleyRideal_3D.o ${OBJDIR}/RandomNumberGenerator.o          \
-				${COMMONDEP}
+				${OBJDIR}/FiniteDifference.o ${COMMONDEP}
 
 # Module containing the common data (v3)
 ${OBJDIR}/SharedData.o : ${SRCDIR}/SharedData.f90 ${OBJDIR}/IndependentOscillatorsModel.o ${COMMONDEP}
@@ -532,6 +532,9 @@ ${OBJDIR}/InputField.o : ${SRCDIR}/InputField.f90 ${COMMONDEP}
 
 # Wrapper for FFTW 3.3
 ${OBJDIR}/FFTWrapper.o : ${SRCDIR}/FFTWrapper.f90 ${COMMONDEP}
+
+# Compute derivatives with finite difference
+${OBJDIR}/FiniteDifference.o : ${SRCDIR}/FiniteDifference.f90 ${COMMONDEP}
 
 # Module containing the spline interpolation subroutines
 ${OBJDIR}/SplineInterpolator.o : ${SRCDIR}/SplineInterpolator.f90 ${OBJDIR}/NRUtility.o Makefile

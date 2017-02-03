@@ -30,11 +30,12 @@ MODULE PotentialModule
 #include "preprocessoptions.cpp"
    USE RandomNumberGenerator
    USE UnitConversion
+   USE FiniteDifference
 
    PRIVATE
    PUBLIC :: SetupPotential                                        !< setup subroutine
    PUBLIC :: GetXLabel, GetSystemDimension, PESIsCollinear         !< info subroutines
-   PUBLIC :: GetPotential, GetPotAndForces, GetSecondDerivatives   !< get potential and forces, and second derivatives
+   PUBLIC :: GetPotential, GetPotAndForces                         !< get potential and forces
    PUBLIC :: GetVPartitions                                        !< get pot energy partitioned according to some relevant scheme
    PUBLIC :: SteepLocator, NewtonLocator                           !< optimization and stationary points
    PUBLIC :: StartSystemForScattering                              !< system initial conditions subroutines
@@ -407,8 +408,8 @@ MODULE PotentialModule
 !**************************************************************************************
       REAL FUNCTION GetPotAndForces( Positions, Forces ) RESULT(V) 
          IMPLICIT NONE
-         REAL, DIMENSION(:), INTENT(IN)                        :: Positions     
-         REAL, DIMENSION(SIZE(Positions)), INTENT(OUT)         :: Forces 
+         REAL, DIMENSION(:), INTENT(IN)    :: Positions     
+         REAL, DIMENSION(:), INTENT(OUT)   :: Forces 
          REAL               :: FirstDer, SecDer, DeltaF
          INTEGER            :: NIter, k
 
@@ -428,6 +429,7 @@ MODULE PotentialModule
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetPotAndForces : module not set" )
          ! Check the number of degree of freedom
          CALL ERROR( size(Positions) /= NDim, "PotentialModule.GetPotAndForces: input array dimension mismatch" )
+         CALL ERROR( size(Forces) /= NDim, "PotentialModule.GetPotAndForces: output array dimension mismatch" )
 
          ! Compute energy
          IF ( VReducedDim ==  FULLPOT ) THEN
@@ -467,52 +469,6 @@ MODULE PotentialModule
 
       END FUNCTION GetPotAndForces
 
-!===============================================================================================================================
-
-!**************************************************************************************
-!> Compute the second derivatives of the potential
-!>
-!> @param AtPoint   Input vector with the coordinates where to compute H
-!> @returns         Matrix of 2nd derivatives of the potential in AtPoint
-!**************************************************************************************
-      FUNCTION GetSecondDerivatives( AtPoint ) RESULT( SecDeriv )
-         REAL, DIMENSION(:), INTENT(IN)                 :: AtPoint
-         REAL, DIMENSION(size(AtPoint),size(AtPoint))   :: SecDeriv
-
-         REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
-         REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /) 
-
-         REAL, DIMENSION(size(AtPoint)) :: Coordinates, FirstDerivative
-         REAL :: Potential
-         INTEGER :: i,k
-
-         ! Error if module not have been setup yet
-         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetSecondDerivatives : module not set" )
-         ! Check the number of degree of freedom
-         CALL ERROR( size(AtPoint) /= NDim, "PotentialModule.GetSecondDerivatives: input array dimension mismatch" )
-
-         SecDeriv(:,:) = 0.0
-         DO i = 1, NDim
-            DO k = 1, size(Deltas)
-
-               ! Define small displacement from the point where compute the derivative
-               Coordinates(:) = AtPoint(:)
-               Coordinates(i) = Coordinates(i) + Deltas(k)*SmallDelta
-
-               ! Compute potential and forces in the displaced coordinate
-               Potential = GetPotAndForces( Coordinates, FirstDerivative )
-               FirstDerivative = - FirstDerivative
-
-               ! Increment numerical derivative of the analytical derivative
-               SecDeriv(i,:) = SecDeriv(i,:) + Coeffs(k)*FirstDerivative(:)
-
-            END DO
-         END DO
-
-         SecDeriv(:,:) = SecDeriv(:,:)/SmallDelta
-!        CALL TheOneWithMatrixPrintedLineAfterLine( SecDeriv )
-
-      END FUNCTION GetSecondDerivatives
  
 !===============================================================================================================================
 
@@ -629,8 +585,8 @@ MODULE PotentialModule
             X = NewtonLocator( X, 10**3, 1.E-6, 1.E-6 )
             
             ! COMPUTE HESSIAN, DIVIDE IT BY THE MASSES AND FIND NORMAL MODES
-            ! Use subroutine GetSecondDerivatives to compute the matrix of the 2nd derivatives
-            Hessian(:,:) = GetSecondDerivatives( X ) 
+            ! Use subroutine GetHessianFromForces to compute the matrix of the 2nd derivatives
+            Hessian(:,:) = GetHessianFromForces( X, GetPotAndForces, SmallDelta ) 
             ! Numerical hessian of the potential in mass weighted coordinates
             DO j = 1, NDim
                DO i = 1, NDim
@@ -805,7 +761,7 @@ MODULE PotentialModule
 
 #if defined(LOG_FILE)
          ! Check the number of imaginary frequencies
-         Hessian = GetSecondDerivatives( StationaryPoint )
+         Hessian = GetHessianFromForces( StationaryPoint, GetPotAndForces, SmallDelta )
          CALL TheOneWithDiagonalization( Hessian, EigenVectors, EigenValues )
          WRITE(__LOG_UNIT,"(/,A,I3,A,/)") " SteepLocator | Final stationary point has ", COUNT( EigenValues < 0.0 ),   &
                                  " imaginary frequency/ies "
@@ -900,7 +856,7 @@ MODULE PotentialModule
 
             ! Get potential, 1st and 2nd derivatives
             V = GetPotAndForces( CurrentX, Forces )
-            Hessian = GetSecondDerivatives( CurrentX )
+            Hessian = GetHessianFromForces( CurrentX, GetPotAndForces, SmallDelta )
 
             ! Apply constraints
             IF ( PRESENT(Mask) ) THEN
@@ -986,11 +942,11 @@ MODULE PotentialModule
          ! Check the number of imaginary frequencies
          IF ( PRESENT(Mask) ) THEN
             ! Compute constrained Hessian at current position
-            Hessian = GetSecondDerivatives( CurrentX )
+            Hessian = GetHessianFromForces( CurrentX, GetPotAndForces, SmallDelta )
             WrkHessian = ConstrainedHessian( Hessian, Mask, COUNT(Mask) )
          ELSE
             ! compute Hessian at current position
-            WrkHessian = GetSecondDerivatives( CurrentX )
+            WrkHessian = GetHessianFromForces( CurrentX, GetPotAndForces, SmallDelta )
          END IF
          ! Diagonalize Hessian to transform coords to normal modes
          CALL TheOneWithDiagonalization( WrkHessian, EigenVectors, EigenValues )
@@ -1243,37 +1199,3 @@ END MODULE PotentialModule
 ! ! ************************************************************************************
 ! 
  
-!    REAL FUNCTION DirectionalSecondDerivative( AtPoint, Direction, NormalMode )
-!       IMPLICIT NONE
-!       REAL, DIMENSION(NDim), INTENT(IN) :: AtPoint, Direction, NormalMode
-! 
-!       REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
-!       REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /) 
-! 
-!       REAL, DIMENSION(NDim) :: Coordinates, FirstDerivative
-!       REAL :: Potential, Norm
-!       INTEGER :: k
-! 
-!       Norm = 0.0
-!       DO k = 1, size(Direction)
-!          Norm = Norm + Direction(k)**2
-!       END DO
-!       CALL ERROR( ABS(SQRT(Norm)-1.0) > 1E-12 , " DirectionalSecondDerivative: Direction is not normalized" )
-!       Norm = 0.0
-!       DO k = 1, size(NormalMode)
-!          Norm = Norm + NormalMode(k)**2
-!       END DO
-!       CALL ERROR( ABS(SQRT(Norm)-1.0) > 1E-12 , " DirectionalSecondDerivative: NormalMode is not normalized" )
-! 
-!       DirectionalSecondDerivative = 0.0
-! 
-!       DO k = 1, size(Deltas)
-!          Coordinates(:) = AtPoint(:) + SmallDelta*Deltas(k)*NormalMode(:)
-!          Potential = VHSticking( Coordinates, FirstDerivative )
-!          DirectionalSecondDerivative = DirectionalSecondDerivative - &
-!                           Coeffs(k)* TheOneWithVectorDotVector(Direction,FirstDerivative) /SmallDelta
-!       END DO
-! 
-!    END FUNCTION DirectionalSecondDerivative
-! 
-! !*************************************************************************************************
