@@ -372,8 +372,8 @@ MODULE ClassicalEqMotion
 
       INTERFACE
          REAL FUNCTION GetPotential( X, Force )
-            REAL, DIMENSION(:), TARGET, INTENT(IN)  :: X
-            REAL, DIMENSION(:), TARGET, INTENT(OUT) :: Force
+            REAL, DIMENSION(:), INTENT(IN)  :: X
+            REAL, DIMENSION(:), INTENT(OUT) :: Force
          END FUNCTION GetPotential
       END INTERFACE
       
@@ -494,8 +494,8 @@ MODULE ClassicalEqMotion
 
       INTERFACE
          REAL FUNCTION GetPotential( X, Force )
-            REAL, DIMENSION(:), TARGET, INTENT(IN)  :: X
-            REAL, DIMENSION(:), TARGET, INTENT(OUT) :: Force
+            REAL, DIMENSION(:), INTENT(IN)  :: X
+            REAL, DIMENSION(:), INTENT(OUT) :: Force
          END FUNCTION GetPotential
       END INTERFACE
 
@@ -588,8 +588,8 @@ MODULE ClassicalEqMotion
    
       INTERFACE
          REAL FUNCTION GetPotential( X, Force )
-            REAL, DIMENSION(:), TARGET, INTENT(IN)  :: X
-            REAL, DIMENSION(:), TARGET, INTENT(OUT) :: Force
+            REAL, DIMENSION(:), INTENT(IN)  :: X
+            REAL, DIMENSION(:), INTENT(OUT) :: Force
          END FUNCTION GetPotential
       END INTERFACE
 

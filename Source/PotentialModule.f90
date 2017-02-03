@@ -287,7 +287,7 @@ MODULE PotentialModule
 !**************************************************************************************
       REAL FUNCTION GetPotential( Positions ) RESULT(V) 
          IMPLICIT NONE
-         REAL, DIMENSION(:), TARGET, INTENT(IN)  :: Positions
+         REAL, DIMENSION(:), INTENT(IN)  :: Positions
          REAL, DIMENSION(3) :: Dummy
          REAL               :: FirstDer, SecDer, DeltaF
          INTEGER            :: NIter, k
@@ -355,7 +355,7 @@ MODULE PotentialModule
 !******************************************************************************
       FUNCTION GetVPartitions( Positions ) RESULT( VPart ) 
          IMPLICIT NONE
-         REAL, DIMENSION(:), TARGET, INTENT(IN)   :: Positions    
+         REAL, DIMENSION(:), INTENT(IN)           :: Positions    
          REAL, DIMENSION(3)                       :: VPart 
 
          REAL, DIMENSION(3) :: Dummy
@@ -407,8 +407,8 @@ MODULE PotentialModule
 !**************************************************************************************
       REAL FUNCTION GetPotAndForces( Positions, Forces ) RESULT(V) 
          IMPLICIT NONE
-         REAL, DIMENSION(:), TARGET, INTENT(IN)                :: Positions     
-         REAL, DIMENSION(SIZE(Positions)), TARGET, INTENT(OUT) :: Forces 
+         REAL, DIMENSION(:), INTENT(IN)                        :: Positions     
+         REAL, DIMENSION(SIZE(Positions)), INTENT(OUT)         :: Forces 
          REAL               :: FirstDer, SecDer, DeltaF
          INTEGER            :: NIter, k
 

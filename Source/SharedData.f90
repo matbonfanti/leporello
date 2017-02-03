@@ -75,9 +75,9 @@ MODULE SharedData
  
    ! POSITION, VELOCITY, ACCELERATION 
 
-   REAL, DIMENSION(:), ALLOCATABLE, TARGET :: X    !< Position at given timestep
-   REAL, DIMENSION(:), ALLOCATABLE, TARGET :: V    !< Velocity at given timestep
-   REAL, DIMENSION(:), ALLOCATABLE, TARGET :: A    !< Acceleration at ginve timestep
+   REAL, DIMENSION(:), ALLOCATABLE :: X    !< Position at given timestep
+   REAL, DIMENSION(:), ALLOCATABLE :: V    !< Velocity at given timestep
+   REAL, DIMENSION(:), ALLOCATABLE :: A    !< Acceleration at ginve timestep
 
    ! VECTOR WITH THE MASSES
 

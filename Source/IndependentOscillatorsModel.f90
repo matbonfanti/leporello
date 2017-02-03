@@ -403,9 +403,9 @@ CONTAINS
       IMPLICIT NONE
       TYPE(BathData), INTENT(IN)                :: Bath
       REAL, INTENT(IN)                          :: QCoupl
-      REAL, DIMENSION(:), TARGET, INTENT(IN)    :: QBath
+      REAL, DIMENSION(:), INTENT(IN)            :: QBath
       REAL, INTENT(INOUT)                       :: V, CouplForce
-      REAL, DIMENSION(:), TARGET, INTENT(INOUT) :: QForces 
+      REAL, DIMENSION(:), INTENT(INOUT)         :: QForces 
       REAL, INTENT(OUT), OPTIONAL               :: CouplingV
       REAL, INTENT(OUT), OPTIONAL               :: DTimesEffMode
 

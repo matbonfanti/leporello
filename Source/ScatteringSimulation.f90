@@ -697,8 +697,8 @@ MODULE ScatteringSimulation
 
    REAL FUNCTION ScatteringPotential( Positions, Forces )
       IMPLICIT NONE
-      REAL, DIMENSION(:), TARGET, INTENT(IN)  :: Positions
-      REAL, DIMENSION(:), TARGET, INTENT(OUT) :: Forces
+      REAL, DIMENSION(:), INTENT(IN)  :: Positions
+      REAL, DIMENSION(:), INTENT(OUT) :: Forces
       REAL :: CouplingFs, DTimesX
 
       ! Check the number degrees of freedom
@@ -738,8 +738,8 @@ MODULE ScatteringSimulation
    FUNCTION ExpectationValues( X, V ) RESULT( Expectations )
       IMPLICIT NONE
       REAL, DIMENSION(NrEnAverages) :: Expectations   
-      REAL, DIMENSION(:), TARGET, INTENT(IN)  :: X
-      REAL, DIMENSION(:), TARGET, INTENT(IN)  :: V
+      REAL, DIMENSION(:), INTENT(IN)  :: X
+      REAL, DIMENSION(:), INTENT(IN)  :: V
 
       REAL :: VCoupling, VBath, ReducedMass
       INTEGER :: i
