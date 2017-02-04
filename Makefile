@@ -514,7 +514,7 @@ ${OBJDIR}/ClassicalEqMotion.o  : ${SRCDIR}/ClassicalEqMotion.f90 ${OBJDIR}/Rando
 
 # Module containing the potential energy surface
 ${OBJDIR}/PotentialModule.o  : ${SRCDIR}/PotentialModule.f90 ${OBJDIR}/vEleyRideal_3D.o ${OBJDIR}/RandomNumberGenerator.o          \
-				${OBJDIR}/FiniteDifference.o ${OBJDIR}/Optimize.o ${COMMONDEP}
+				${OBJDIR}/FiniteDifference.o ${COMMONDEP}
 
 # Module containing the common data (v3)
 ${OBJDIR}/SharedData.o : ${SRCDIR}/SharedData.f90 ${OBJDIR}/IndependentOscillatorsModel.o ${COMMONDEP}

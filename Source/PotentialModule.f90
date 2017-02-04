@@ -32,7 +32,6 @@ MODULE PotentialModule
 #include "preprocessoptions.cpp"
    USE RandomNumberGenerator
    USE FiniteDifference
-   USE Optimize
    IMPLICIT NONE
 
    PRIVATE
@@ -40,7 +39,7 @@ MODULE PotentialModule
    PUBLIC :: GetXLabel, GetSystemDimension, PESIsCollinear         !< info subroutines
    PUBLIC :: GetPotential, GetPotAndForces                         !< get potential and forces
    PUBLIC :: GetVPartitions                                        !< get pot energy partitioned according to some relevant scheme
-   PUBLIC :: StartSystemForScattering                              !< system initial conditions subroutines
+   PUBLIC :: StartSystemForScattering, GetInitialAsymptoteMask     !< system initial conditions subroutines
    PUBLIC :: GetNrChannels, GetChannelLabel, GetCurrentChannel     !< trajectory analysis
    
    !> Setup variable for the potential
@@ -54,9 +53,6 @@ MODULE PotentialModule
 
    !> Step for computing the numerical derivatives with finite differences
    REAL, PARAMETER :: SmallDelta = 0.00001
-
-   !> Logical control variable for the log of subroutine StartSystemForScattering
-   LOGICAL, SAVE  :: LogScattInit = .TRUE.
    
 #if defined(LOG_FILE)
    CHARACTER(17), SAVE :: LogStr = " SetupPotential |"
@@ -71,6 +67,13 @@ MODULE PotentialModule
    !> Variable to temprarary store optimize value of zc for adiabatic potential
    REAL, SAVE  :: OptZc = 0.0
 
+   ! Reference geometry values of the potential
+   REAL, PARAMETER  ::  Minimum_ZHTar = 2.7955073359492473  !< equilibrium cartesian Z of HTargon in initial asymptote / bohr
+   REAL, PARAMETER  ::  Minimum_ZCarb = 0.69156392247796172 !< equilibrium cartesian Z of Carbon in initial asymptote / bohr
+   REAL, PARAMETER  ::  H2EqD = 1.51178089965204958905       !< equilibrium distance of H2 in final asymptote / bohr
+
+   
+   
    CONTAINS
 
 !===============================================================================================================================
@@ -278,6 +281,79 @@ MODULE PotentialModule
 
 !===============================================================================================================================
 
+
+!**************************************************************************************
+!> Setup appropriate initial condition for the subsystem.
+!>
+!> @param X              Output vector with the initial positions of the system
+!> @param V              Output vector with the initial Velocities of the system
+!> @param M              Input vector with the masses of the system coordinates
+!> @param InitDist       Input real value of the scatterer distace
+!> @param InitEKin       Input real value of the scatterer kinetic energy
+!> @param ImpactPar      Input real value of the impact parameter
+!> @param Task           Input integer to define the task of the initialization
+!**************************************************************************************
+      SUBROUTINE StartSystemForScattering( X, V, M, InitDist, InitEKin, ImpactPar, Task )
+         IMPLICIT NONE
+         REAL, DIMENSION(:), INTENT(OUT)       :: X
+         REAL, DIMENSION(size(X)), INTENT(OUT) :: V
+         REAL, DIMENSION(size(X)), INTENT(IN)  :: M
+         REAL                                  :: InitDist, InitEKin, ImpactPar
+         INTEGER                               :: Task
+
+         INTEGER, PARAMETER   ::  SCATTERING       = 1
+         INTEGER, PARAMETER   ::  ASYMPTOTIC_START = 2
+        
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.StartSystemForScattering : module not set" )
+         ! Check the number of degree of freedom
+         CALL ERROR( size(X) /= NDim, "PotentialModule.StartSystemForScattering: input array dimension mismatch" )
+
+         SELECT CASE ( Task )
+         
+            ! In case of a ASYMPTOTIC_START task, the scatterer is placed far from the target, with no incoming velocity
+            ! the substrate is placed in equilibrium geometry
+            CASE ( ASYMPTOTIC_START )       
+                X(1) = InitDist
+                X(2) = Minimum_ZHTar
+                IF (NDim == 3) X(3) = Minimum_ZCarb
+                
+            ! In case of a SCATTERING task, the scatterer is placed at the input initial conditions 
+            ! the substrate is left untouched
+            CASE ( SCATTERING )
+               X(1) = InitDist
+               V(1) = -SQRT( 2.0 * InitEKin / M(1) )
+               
+            CASE DEFAULT
+               CALL AbortWithError( "PotentialModule.StartSystemForScattering : Task is not defined" )
+               
+         END SELECT
+
+      END SUBROUTINE StartSystemForScattering
+
+      
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Function that returns a logical mask for initial asymptote optimization 
+!> @returns   Logical vector with .FALSE. corresponding to the scattering coordinate
+!**************************************************************************************
+      FUNCTION GetInitialAsymptoteMask( ) RESULT(Mask)
+         IMPLICIT NONE
+         LOGICAL, DIMENSION(NDim) :: Mask
+         
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetInitialAsymptoteMask : Module not Setup" )
+
+         Mask(1) = .FALSE.
+         Mask(2) = .TRUE.
+         IF ( VReducedDim ==  FULLPOT )  Mask(3) = .TRUE.
+ 
+      END FUNCTION GetInitialAsymptoteMask
+      
+!===============================================================================================================================
+
+
 !**************************************************************************************
 !> Subrotine to compute potential for the 3D system model, i.e.
 !> collinear H + H + C, input and output are in internal coordinates
@@ -315,7 +391,7 @@ MODULE PotentialModule
            CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Dummy(1), Dummy(2), Dummy(3) )
 
          ELSE IF ( VReducedDim == SUDDEN ) THEN
-            CALL ER_3D( Positions(1), Positions(2), 0.691576, V, Dummy(1), Dummy(2), Dummy(3) )
+            CALL ER_3D( Positions(1), Positions(2), Minimum_ZCarb, V, Dummy(1), Dummy(2), Dummy(3) )
 
          ELSE IF ( VReducedDim == ADIABATIC ) THEN
             CALL AbortWithError(" Adiabatic not yet implemented" )
@@ -358,9 +434,7 @@ MODULE PotentialModule
          IMPLICIT NONE
          REAL, DIMENSION(:), INTENT(IN)           :: Positions    
          REAL, DIMENSION(3)                       :: VPart 
-
          REAL, DIMENSION(3) :: Dummy
-         REAL, PARAMETER :: H2EqD = 1.51178089965204958905d0  !< equilibrium distance of H2 / Bohr
          REAL :: zC, E1, E2
          
          INTERFACE
@@ -378,7 +452,7 @@ MODULE PotentialModule
          IF ( VReducedDim ==  FULLPOT ) THEN
             zC = Positions(3)
          ELSE IF ( VReducedDim == SUDDEN ) THEN
-            zC = 0.691576
+            zC = Minimum_ZCarb
          ELSE IF ( VReducedDim == ADIABATIC ) THEN
             CALL AbortWithError(" Adiabatic not yet implemented" )
          END IF
@@ -436,7 +510,7 @@ MODULE PotentialModule
            CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Forces(1), Forces(2), Forces(3) )
 
          ELSE IF ( VReducedDim == SUDDEN ) THEN
-            CALL ER_3D( Positions(1), Positions(2), 0.691576, V, Forces(1), Forces(2), FirstDer )
+            CALL ER_3D( Positions(1), Positions(2), Minimum_ZCarb, V, Forces(1), Forces(2), FirstDer )
 
          ELSE IF ( VReducedDim == ADIABATIC ) THEN
             CALL AbortWithError(" Adiabatic not yet implemented" )
@@ -469,159 +543,8 @@ MODULE PotentialModule
 
       END FUNCTION GetPotAndForces
 
- 
 !===============================================================================================================================
 
-
-!**************************************************************************************
-!> Setup initial condition for the system, in the case of a scattering simulation.
-!> The initial state can be chosen to be either a finite temperature classical 
-!> state or a quasi-classical T=0 K state.
-!>
-!> @param X              Output vector with the initial positions of the system
-!> @param V              Output vector with the initial Velocities of the system
-!> @param M              Input vector with the masses of the system coordinates
-!> @param InitDist       Input real value of the scatterer distace
-!> @param InitEKin       Input real value of the scatterer kinetic energy
-!> @param ImpactPar      Input real value of the impact parameter
-!> @param Temperature    Input real value of the temperature
-!> @param RandomNr       Internal state of the random number generator
-!> @param Task           Integer flag to set the task to perform
-!**************************************************************************************
-      SUBROUTINE StartSystemForScattering( X, V, M, InitDist, InitEKin, ImpactPar, Temperature, RandomNr, Task )
-         IMPLICIT NONE
-         REAL, DIMENSION(:), INTENT(OUT)       :: X
-         REAL, DIMENSION(size(X)), INTENT(OUT) :: V
-         REAL, DIMENSION(size(X)), INTENT(IN)  :: M
-         REAL                                  :: InitDist, InitEKin, ImpactPar
-         REAL                                  :: Temperature
-         TYPE(RNGInternalState), INTENT(INOUT) :: RandomNr
-         INTEGER                               :: Task
-
-         INTEGER, PARAMETER   ::  EQUILIBRATION_CLASSICAL = 1
-         INTEGER, PARAMETER   ::  SCATTERING_CLASSICAL    = 2
-         INTEGER, PARAMETER   ::  QUASICLASSICAL          = 3
-         
-         REAL, DIMENSION(size(X),size(X)) ::  Hessian, NormalModesVec
-         REAL, DIMENSION(size(X))         ::  NormalModesVal
-         INTEGER :: i,j
-         REAL    :: Value, CarbonFreq, SigmaV
-
-         ! Error if module not have been setup yet
-         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.StartSystemForScattering : module not set" )
-         ! Check the number of degree of freedom
-         CALL ERROR( size(X) /= NDim, "PotentialModule.StartSystemForScattering: input array dimension mismatch" )
-
-         ! In case of a SCATTERING_CLASSICAL task, coordinates of the substrate are left untouched
-         IF ( Task == EQUILIBRATION_CLASSICAL .OR. Task ==  QUASICLASSICAL ) THEN
-         
-            ! SET INITIAL GEOMETRY, OPTIMIZING THE NON-SCATTERING COORDINATES
-            X(1) = 10.0000 / MyConsts_Bohr2Ang
-            X(2) = 1.45000 / MyConsts_Bohr2Ang
-            IF (NDim == 3) X(3) = 0.35000 / MyConsts_Bohr2Ang
-            X = NewtonLocator( GetPotAndForces, X, 10**3, 1.E-6, 1.E-6, SmallDelta )
-            
-            ! COMPUTE HESSIAN, DIVIDE IT BY THE MASSES AND FIND NORMAL MODES
-            ! Use subroutine GetHessianFromForces to compute the matrix of the 2nd derivatives
-            Hessian(:,:) = GetHessianFromForces( X, GetPotAndForces, SmallDelta ) 
-            ! Numerical hessian of the potential in mass weighted coordinates
-            DO j = 1, NDim
-               DO i = 1, NDim
-                  Hessian(i,j) = Hessian(i,j) / SQRT( M(i)*M(j) )
-               END DO
-            END DO
-            ! Diagonalize
-            CALL TheOneWithDiagonalization(Hessian, NormalModesVec, NormalModesVal)
-
-            ! WEIGHT STARTING COORDS BY MASS AND TRANSFORM TO THE NORMAL MODES REFERENCE
-            DO i = 1, NDim
-               X(i) = X(i) * SQRT( M(i) )
-            END DO
-            X = TheOneWithMatrixVectorProduct( TheOneWithTransposeMatrix(NormalModesVec), X )
-
-            ! SET VELOCITIES AND MOMENTA OF BOUND COORDINATES
-
-            ! cycle over the coordinates
-            DO i = 1, NDim
-
-               ! Set sigma of the maxwell boltzmann distribution
-               SigmaV = sqrt( Temperature )
-
-               ! the coordinate is bound
-               IF ( NormalModesVal(i) > 0. ) THEN
-                  ! set frequency of the normal mode
-                  CarbonFreq = SQRT( NormalModesVal(i) )
-                  ! Classical distribution
-                  IF ( Task == EQUILIBRATION_CLASSICAL ) THEN
-                     X(i) = X(i) + GaussianRandomNr(RandomNr) * SigmaV / CarbonFreq
-                     V(i) = GaussianRandomNr(RandomNr) * SigmaV
-                  ! Quasiclassical distribution
-                  ELSE IF (  Task ==  QUASICLASSICAL ) THEN
-                     Value = UniformRandomNr( RandomNr )*2.0*MyConsts_PI
-                     X(i) = X(i) + COS(Value) / SQRT(CarbonFreq)
-                     V(i) = SIN(Value) * SQRT(CarbonFreq)
-                  END IF
-
-               ! unbound coordinate (set velocity according to maxwell-boltzman) 
-               ELSE
-                  X(i) = X(i)
-                  V(i) = GaussianRandomNr(RandomNr) * SigmaV
-
-               ENDIF
-            END DO
-               
-            ! TRASFORM BACK TO ORIGINAL FRAME AND TO NOT-MASS-WEIGHTED COORDINATES
-            X = TheOneWithMatrixVectorProduct( NormalModesVec, X )
-            V = TheOneWithMatrixVectorProduct( NormalModesVec, V )
-            DO i = 1, NDim
-               X(i) = X(i) / SQRT( M(i) )
-               V(i) = V(i) / SQRT( M(i) )
-            END DO
-
-         END IF 
-         
-         ! Set initial coord and vel of the scatterer
-         SELECT CASE ( Task )
-            CASE ( EQUILIBRATION_CLASSICAL )
-               X(1) = X(1)
-               V(1) = 0.0
-            CASE ( QUASICLASSICAL, SCATTERING_CLASSICAL )
-               X(1) = InitDist
-               V(1) = -SQRT( 2.0 * InitEKin / M(1) )
-            CASE DEFAULT
-               CALL AbortWithError( "PotentialModule.StartSystemForScattering : Task is not defined" )
-         END SELECT
-
-         IF ( LogScattInit ) THEN
-
-              ! PRINT INFO
-              ! system starts with random displacement around this minimum geometry and random momenta
-              ! computed in the frame of the normal modes
-              ! frequencies for the bound states are computed with a normal modes analysis at the minimum
-              ! here are the frequencies: 
-              ! i-th normal mode is a bound coordinate of frequency tot
-              ! j-th degree is a free coordinate of imaginary frequency tot
-              ! displacement and momenta along the normal modes follow a classical boltzmann distribution for a harmonic Oscillators
-              ! or a quasi-classical distribution for a harmonic oscillator at a classical orbit of energy
-              ! given by the ZPE hbar*omega
-              
-              ! -----------------------
-              
-!             DO i = 1, NDim
-!                IF ( NormalModesVal(i) > 0. ) THEN
-!                   PRINT*, SQRT(NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits)
-!                ELSE
-!                   PRINT*, SQRT(-NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits), " *i"
-!                ENDIF
-!             END DO
-
-              LogScattInit = .FALSE.
-              
-          END IF 
-
-      END SUBROUTINE StartSystemForScattering
-
-!===============================================================================================================================
 
 END MODULE PotentialModule
 

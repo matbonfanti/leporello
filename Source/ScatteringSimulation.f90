@@ -78,6 +78,8 @@ MODULE ScatteringSimulation
    ! Random number generator internal status
    TYPE(RNGInternalState), SAVE :: RandomNr    !< spectial type dat to store internal status of random nr generator
 
+!    !> Logical control variable for the log of subroutine StartSystemForScattering
+!    LOGICAL, SAVE  :: LogScattInit = .TRUE.
 
    CONTAINS
 
@@ -409,9 +411,8 @@ MODULE ScatteringSimulation
             END IF
 
             ! Set initial coordinates for the scattering, task = 2 fix the scatterer at initial conditions
-            CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), InitDistance, &
-                        InitEKin, ImpactPar, Temperature, RandomNr, task = 2 )
-
+            CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), InitDistance, InitEKin, ImpactPar, Task=1 )
+                        
             !*************************************************************
             ! INFORMATION ON INITIAL CONDITIONS, INITIALIZATION, OTHER...
             !*************************************************************
@@ -841,18 +842,16 @@ MODULE ScatteringSimulation
       CALL ERROR( size(X) /= NDim, "ScatteringSimulation.SubstrateInitialConditions: array dimension mismatch (1)" )
       CALL ERROR( size(V) /= NDim, "ScatteringSimulation.SubstrateInitialConditions: array dimension mismatch (2)" )
 
-      ! Put initial scatterer asymptotically, and the rest of the degrees of freedom in a good guess for initial minimum
-      X(1) = 100.0000 / MyConsts_Bohr2Ang
-      X(2) = 1.4000 / MyConsts_Bohr2Ang                     ! NOTE: later these lines should be moved in an ad-hoc sub 
-      IF (NDim == 3) X(3) = 0.3000 / MyConsts_Bohr2Ang      ! of PotentialModule, since they depend on the system choice
+      ! Put initial scatterer asymptotically...
+      CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), 2000., 0.0, 0.0, Task=2 )
+      ! ... and the rest of the degrees of freedom in a good guess for initial minimum
       IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
          X(NSys+1:) = 0.0
       END IF
 
       ! Optimize the potential and find the position of the local minimum 
-      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3 )
-      XEquil(1) = 100.0000 / MyConsts_Bohr2Ang
-
+      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3, GetInitialAsymptoteMask() )
+      
       ! compute the hessian in mass scaled coordinates
       Hessian(:,:) = GetMassScaledHessian( XEquil ) 
       ! and diagonalize it
@@ -896,6 +895,34 @@ MODULE ScatteringSimulation
          V(i) = V(i) / SQRT( MassVector(i) )
       END DO
       X = X + XEquil
+      
+!          IF ( LogScattInit ) THEN
+! 
+!               ! PRINT INFO
+!               ! system starts with random displacement around this minimum geometry and random momenta
+!               ! computed in the frame of the normal modes
+!               ! frequencies for the bound states are computed with a normal modes analysis at the minimum
+!               ! here are the frequencies: 
+!               ! i-th normal mode is a bound coordinate of frequency tot
+!               ! j-th degree is a free coordinate of imaginary frequency tot
+!               ! displacement and momenta along the normal modes follow a classical boltzmann distribution 
+!               ! for a harmonic Oscillators
+!               ! or a quasi-classical distribution for a harmonic oscillator at a classical orbit of energy
+!               ! given by the ZPE hbar*omega
+!               
+!               ! -----------------------
+!               
+! !             DO i = 1, NDim
+! !                IF ( NormalModesVal(i) > 0. ) THEN
+! !                   PRINT*, SQRT(NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits)
+! !                ELSE
+! !                   PRINT*, SQRT(-NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits), " *i"
+! !                ENDIF
+! !             END DO
+! 
+!               LogScattInit = .FALSE.
+!               
+!           END IF 
       
    END SUBROUTINE SubstrateInitialConditions
    
