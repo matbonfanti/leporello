@@ -81,6 +81,12 @@ MODULE ScatteringSimulation
 !    !> Logical control variable for the log of subroutine StartSystemForScattering
 !    LOGICAL, SAVE  :: LogScattInit = .TRUE.
 
+   ! Arrays used for defining initial conditions of the trajectories  
+   REAL, ALLOCATABLE, DIMENSION(:)     ::  XEquil             !< Optimized geometry at the asymptotic init channel
+   REAL, ALLOCATABLE, DIMENSION(:,:)   ::  Hessian            !< Hessian matrix at XEquil
+   REAL, ALLOCATABLE, DIMENSION(:,:)   ::  NormalModesVec     !< Normal modes vectors at XEquil
+   REAL, ALLOCATABLE, DIMENSION(:)     ::  NormalModesVal     !< Normal modes squared frequencies at XEquil
+      
    CONTAINS
 
 !===============================================================================================================================
@@ -276,6 +282,9 @@ MODULE ScatteringSimulation
          CALL ERROR( PESIsCollinear(), " Scattering_Initialize: a non collinear potential is needed!" )
       END IF 
 
+      ! Allocate memory for geometry optimization and normal mode analysis
+      ALLOCATE( Hessian(NDim,NDim), NormalModesVec(NDim,NDim), NormalModesVal(NDim), XEquil(NDim) )
+      
    END SUBROUTINE Scattering_Initialize
 
 !===============================================================================================================================
@@ -303,6 +312,7 @@ MODULE ScatteringSimulation
       ! VTK file format
       TYPE(VTKInfo), SAVE :: PrintChannelP                                    !< derived datatype to print resolved probability
 
+      
       IF ( PrintType == DEBUG .AND. .NOT. ZPECorrection ) THEN
          ! Open output file to print the brownian realizations of ZH vs time
          TEquilUnit = LookForFreeUnit()
@@ -316,6 +326,52 @@ MODULE ScatteringSimulation
 
       PRINT "(A,I5,A,I5,A)"," Running ", NrTrajs, " trajectories per ",NRhoMax+1," impact parameters ... "
 
+      
+      ! Compute the normal modes at the minimum of the asymptotic incoming configuration
+      
+      ! Put initial scatterer asymptotically...
+      CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), 2000., 0.0, 0.0, Task=2 )
+      ! ... and the rest of the degrees of freedom in a good guess for initial minimum
+      IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
+         X(NSys+1:) = 0.0
+      END IF
+
+      ! Optimize the potential and find the position of the local minimum 
+      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3, GetInitialAsymptoteMask() )
+      
+      ! compute the hessian in mass scaled coordinates
+      Hessian(:,:) = GetMassScaledHessian( XEquil ) 
+      ! and diagonalize it
+      CALL TheOneWithDiagonalization(Hessian, NormalModesVec, NormalModesVal)
+      
+      !          IF ( LogScattInit ) THEN
+! 
+!               ! PRINT INFO
+!               ! system starts with random displacement around this minimum geometry and random momenta
+!               ! computed in the frame of the normal modes
+!               ! frequencies for the bound states are computed with a normal modes analysis at the minimum
+!               ! here are the frequencies: 
+!               ! i-th normal mode is a bound coordinate of frequency tot
+!               ! j-th degree is a free coordinate of imaginary frequency tot
+!               ! displacement and momenta along the normal modes follow a classical boltzmann distribution 
+!               ! for a harmonic Oscillators
+!               ! or a quasi-classical distribution for a harmonic oscillator at a classical orbit of energy
+!               ! given by the ZPE hbar*omega
+!               
+!               ! -----------------------
+!               
+! !             DO i = 1, NDim
+! !                IF ( NormalModesVal(i) > 0. ) THEN
+! !                   PRINT*, SQRT(NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits)
+! !                ELSE
+! !                   PRINT*, SQRT(-NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits), " *i"
+! !                ENDIF
+! !             END DO
+! 
+!               LogScattInit = .FALSE.
+!               
+!           END IF 
+      
       ! scan over the impact parameter... 
       ImpactParameter: DO jRho = 0,NRhoMax
 ! 
@@ -666,6 +722,9 @@ MODULE ScatteringSimulation
       ! Deallocate memory
       DEALLOCATE( X, V, A, MassVector )
 
+      ! Deallocate memory for geometry optimization and normal mode analysis
+      DEALLOCATE( Hessian, NormalModesVec, NormalModesVal, XEquil )
+
       ! Deallocate arrays for averages and probabilities
       IF (ALLOCATED(TrajOutcome)) DEALLOCATE(TrajOutcome)
       IF (ALLOCATED(EnergyAver)) DEALLOCATE(EnergyAver)
@@ -832,30 +891,12 @@ MODULE ScatteringSimulation
       IMPLICIT NONE
       REAL, DIMENSION(:), INTENT(OUT)  :: X
       REAL, DIMENSION(:), INTENT(OUT)  :: V
-
-      REAL, DIMENSION(size(X),size(X)) ::  Hessian, NormalModesVec
-      REAL, DIMENSION(size(X))         ::  NormalModesVal, XEquil
       REAL                             ::  Value, CarbonFreq, SigmaV
       INTEGER                          ::  i
 
       ! Check the number degrees of freedom
       CALL ERROR( size(X) /= NDim, "ScatteringSimulation.SubstrateInitialConditions: array dimension mismatch (1)" )
       CALL ERROR( size(V) /= NDim, "ScatteringSimulation.SubstrateInitialConditions: array dimension mismatch (2)" )
-
-      ! Put initial scatterer asymptotically...
-      CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), 2000., 0.0, 0.0, Task=2 )
-      ! ... and the rest of the degrees of freedom in a good guess for initial minimum
-      IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
-         X(NSys+1:) = 0.0
-      END IF
-
-      ! Optimize the potential and find the position of the local minimum 
-      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3, GetInitialAsymptoteMask() )
-      
-      ! compute the hessian in mass scaled coordinates
-      Hessian(:,:) = GetMassScaledHessian( XEquil ) 
-      ! and diagonalize it
-      CALL TheOneWithDiagonalization(Hessian, NormalModesVec, NormalModesVal)
 
       DO i = 1, NDim            ! cycle over the coordinates
          ! Set sigma of the maxwell boltzmann distribution
@@ -895,35 +936,7 @@ MODULE ScatteringSimulation
          V(i) = V(i) / SQRT( MassVector(i) )
       END DO
       X = X + XEquil
-      
-!          IF ( LogScattInit ) THEN
-! 
-!               ! PRINT INFO
-!               ! system starts with random displacement around this minimum geometry and random momenta
-!               ! computed in the frame of the normal modes
-!               ! frequencies for the bound states are computed with a normal modes analysis at the minimum
-!               ! here are the frequencies: 
-!               ! i-th normal mode is a bound coordinate of frequency tot
-!               ! j-th degree is a free coordinate of imaginary frequency tot
-!               ! displacement and momenta along the normal modes follow a classical boltzmann distribution 
-!               ! for a harmonic Oscillators
-!               ! or a quasi-classical distribution for a harmonic oscillator at a classical orbit of energy
-!               ! given by the ZPE hbar*omega
-!               
-!               ! -----------------------
-!               
-! !             DO i = 1, NDim
-! !                IF ( NormalModesVal(i) > 0. ) THEN
-! !                   PRINT*, SQRT(NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits)
-! !                ELSE
-! !                   PRINT*, SQRT(-NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits), " *i"
-! !                ENDIF
-! !             END DO
-! 
-!               LogScattInit = .FALSE.
-!               
-!           END IF 
-      
+     
    END SUBROUTINE SubstrateInitialConditions
    
       
