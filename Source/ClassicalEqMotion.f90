@@ -23,6 +23,7 @@
 !>  \arg 28 November 2013: ring polymer propagation implemented, with symplectic
 !>                         integrator
 !>  \arg 9 December 2013: old integrators have been commented and will be removed
+!>  \arg 20 February 2017: instead of verbose output, debug print is done with logfile
 !
 !>  \todo   clean up the code: leave only 1 propagator for RPMD and 1 propagator for
 !>          normal MD, with or without langevin friction ( in case of RPMD, Parrinello
@@ -71,6 +72,10 @@ MODULE ClassicalEqMotion
          LOGICAL :: IsSetup = .FALSE.                    !< Evolution data has been setup
       END TYPE Evolution
 
+#if defined(LOG_FILE)
+   CHARACTER(21), SAVE :: LogStr = " ClassicalEqMotion |"
+#endif
+      
    CONTAINS
    
 
@@ -117,8 +122,10 @@ MODULE ClassicalEqMotion
       EvolutionData%HasRingPolymer = .FALSE.
       EvolutionData%HasThermostat = .FALSE.
       
-#if defined(VERBOSE_OUTPUT)
-      WRITE(*,"(/,A,I5,A,1F8.3)") "Evolution data type is setup: Nr DoF is ",NDoF," and TimeStep ", TimeStep
+#if defined(LOG_FILE)
+      __OPEN_LOG_FILE
+      WRITE(__LOG_UNIT,"(/,A,A,I3,A,1F8.3)") LogStr,"Evolution data type is setup: Nr DoF is ",NDoF," and TimeStep ", TimeStep
+      __CLOSE_LOG_FILE
 #endif
       
    END SUBROUTINE EvolutionSetup
@@ -190,9 +197,12 @@ MODULE ClassicalEqMotion
       ! Themostat data is now setup
       EvolData%HasThermostat = .TRUE.
 
-#if defined(VERBOSE_OUTPUT)
-      WRITE(*,"(/,A,1F8.3,A,1F8.3)") "Thermostat is setup with Gamma = ",Gamma," and Temperature = ", Temperature
-      WRITE(*,*) " Langevin DoFs: ", EvolData%ThermoSwitch(:)
+            
+#if defined(LOG_FILE)
+      __OPEN_LOG_FILE
+      WRITE(__LOG_UNIT,"(/,A,A,1F8.3,A,1F8.3)") LogStr,"Thermostat is setup with Gamma = ",Gamma," and Temperature = ", Temperature
+      WRITE(__LOG_UNIT,*) LogStr," Langevin DoFs: ", EvolData%ThermoSwitch(:)
+      __CLOSE_LOG_FILE
 #endif
       
    END SUBROUTINE SetupThermostat
@@ -244,8 +254,10 @@ MODULE ClassicalEqMotion
       ! RPMD data is now setup
       EvolData%HasRingPolymer = .TRUE.
 
-#if defined(VERBOSE_OUTPUT)
-      WRITE(*,"(/,A,1I8,A)") "RPMD is setup with ",EvolData%NBeads," replicas "
+#if defined(LOG_FILE)
+      __OPEN_LOG_FILE
+      WRITE(__LOG_UNIT,"(/,A,A,1I8,A)") LogStr, "RPMD is setup with ",EvolData%NBeads," replicas "
+      __CLOSE_LOG_FILE
 #endif
       
    END SUBROUTINE SetupRingPolymer
@@ -280,11 +292,14 @@ MODULE ClassicalEqMotion
       DEALLOCATE( EvolData%Mass )
 
       ! Themostat data is now disposed
-      EvolData%HasThermostat = .FALSE.
+      EvolData%IsSetup = .FALSE.
 
-#if defined(VERBOSE_OUTPUT)
-      WRITE(*,"(/,A)") "Themostat has been disposed"
+#if defined(LOG_FILE)
+      __OPEN_LOG_FILE
+      WRITE(__LOG_UNIT,"(/,A,A)") LogStr, "Time propagator has been disposed"
+      __CLOSE_LOG_FILE
 #endif
+
    END SUBROUTINE DisposeEvolutionData
 
 
@@ -312,9 +327,12 @@ MODULE ClassicalEqMotion
       ! Themostat data is now disposed
       EvolData%HasThermostat = .FALSE.
 
-#if defined(VERBOSE_OUTPUT)
-      WRITE(*,"(/,A)") "Themostat has been disposed"
+#if defined(LOG_FILE)
+      __OPEN_LOG_FILE
+      WRITE(__LOG_UNIT,"(/,A,A)") LogStr, "Thermostat has been disposed"
+      __CLOSE_LOG_FILE
 #endif
+
    END SUBROUTINE DisposeThermostat
 
 
@@ -339,9 +357,12 @@ MODULE ClassicalEqMotion
       ! Ring polymer data is now disposed
       EvolData%HasRingPolymer = .FALSE.
 
-#if defined(VERBOSE_OUTPUT)
-      WRITE(*,"(/,A)") "Ring polymer has been disposed"
+#if defined(LOG_FILE)
+      __OPEN_LOG_FILE
+      WRITE(__LOG_UNIT,"(/,A,A)") LogStr, "Ring polymer has been disposed"
+      __CLOSE_LOG_FILE
 #endif
+
    END SUBROUTINE DisposeRingPolymer
 
 

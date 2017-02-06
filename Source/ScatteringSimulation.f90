@@ -417,7 +417,6 @@ MODULE ScatteringSimulation
             TotEnergy = PotEnergy + KinEnergy
             IstTemperature = 2.0*KinEnergy/(NDim-1)
 
-            WRITE(200,*) iTraj, TotEnergy
             ! When the initial conditions are classical, do a Langevin equilibration
             IF ( .NOT. ZPECorrection ) THEN
 
