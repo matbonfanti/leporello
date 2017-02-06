@@ -30,6 +30,8 @@
 !>  \arg 3 February 2015: sub BathPotentialAndForces has a new optional arg for effective mode
 !>  \arg 8 February 2016: section of the __PRINT_SPECTRAL_DENSITY directive has been moved at an higher
 !>                        level: no formatted output is written here except for the LOG file
+!>  \arg 6 February 2017: in previous revisions the Hessian for the bath was erroneously computed!!!!
+!>                        this wrong 0.5 factor has been removed in this version
 !
 !>  \todo    Initial thermal conditions of a chain bath can be refined by taking into account the coupling
 !>  \todo    Quasi-classical 0K conditions of a chain bath need to be implemented
@@ -58,7 +60,7 @@ MODULE IndependentOscillatorsModel
     
    !> Derived data type to store all the relevant information of a single bath
    TYPE BathData
-      PRIVATE
+!       PRIVATE
       INTEGER :: BathType                             !< Integer parameter to store the bath type (chain, standard ... )
       INTEGER :: BathSize                             !< Number of oscillators of the bath
       REAL, DIMENSION(:), POINTER :: Frequencies      !< Harmonic frequencies of the bath (stored in AU)
@@ -899,18 +901,18 @@ CONTAINS
       IF ( Bath%BathType == CHAIN_BATH ) THEN
          ! Diagonal elements: quadratic terms of the potential
          DO iBath = 1, Bath%BathSize
-            Hessian(iBath,iBath) = 0.5 * Bath%Frequencies(iBath)**2
+            Hessian(iBath,iBath) = Bath%Frequencies(iBath)**2
          END DO
          ! off-diagonal elements: couplings
          DO iBath = 1, Bath%BathSize-1
-            Hessian(iBath,iBath+1) = - 0.5 * Bath%Couplings(iBath+1) / Bath%OscillatorsMass
-            Hessian(iBath+1,iBath) = - 0.5 * Bath%Couplings(iBath+1) / Bath%OscillatorsMass
+            Hessian(iBath,iBath+1) = - Bath%Couplings(iBath+1) / Bath%OscillatorsMass
+            Hessian(iBath+1,iBath) = - Bath%Couplings(iBath+1) / Bath%OscillatorsMass
          END DO
 
       ELSE IF ( Bath%BathType == STANDARD_BATH ) THEN
          ! Diagonal elements: quadratic terms of the potential
          DO iBath = 1, Bath%BathSize
-            Hessian(iBath,iBath) = 0.5 * Bath%Frequencies(iBath)**2
+            Hessian(iBath,iBath) = Bath%Frequencies(iBath)**2
          END DO
       END IF
 
