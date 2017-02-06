@@ -39,7 +39,7 @@ MODULE PotentialModule
    PUBLIC :: GetXLabel, GetSystemDimension, PESIsCollinear         !< info subroutines
    PUBLIC :: GetPotential, GetPotAndForces                         !< get potential and forces
    PUBLIC :: GetVPartitions                                        !< get pot energy partitioned according to some relevant scheme
-   PUBLIC :: StartSystemForScattering, GetInitialAsymptoteMask     !< system initial conditions subroutines
+   PUBLIC :: StartSystemForScattering, GetInitialAsymptoteMask, GetInitialBoundIndices     !< system initial conditions subroutines
    PUBLIC :: GetNrChannels, GetChannelLabel, GetCurrentChannel     !< trajectory analysis
    
    !> Setup variable for the potential
@@ -350,7 +350,32 @@ MODULE PotentialModule
          IF ( VReducedDim ==  FULLPOT )  Mask(3) = .TRUE.
  
       END FUNCTION GetInitialAsymptoteMask
+
       
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Function that returns an array of integer with the indices of all the degrees
+!>  of freedom except the scattering ones.
+!> @returns   Integer vector with the indices of initially bound coordinates
+!**************************************************************************************
+      FUNCTION GetInitialBoundIndices( ) RESULT(Indices)
+         IMPLICIT NONE
+         INTEGER, DIMENSION(NDim-1) :: Indices
+         INTEGER :: n, i
+         
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetInitialBoundIndices : Module not Setup" )
+
+         n = 0
+         DO i = 1, NDim
+            IF (i == 1) CYCLE
+            n = n+1
+            Indices(n) = i
+         END DO
+ 
+      END FUNCTION GetInitialBoundIndices
+
 !===============================================================================================================================
 
 

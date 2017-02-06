@@ -84,7 +84,7 @@ MODULE ScatteringSimulation
    REAL, ALLOCATABLE, DIMENSION(:,:)   ::  NormalModesVec     !< Normal modes vectors at XEquil
    REAL, ALLOCATABLE, DIMENSION(:)     ::  NormalModesVal     !< Normal modes squared frequencies at XEquil
 
-
+  
    CONTAINS
 
 !===============================================================================================================================
@@ -309,7 +309,11 @@ MODULE ScatteringSimulation
       REAL, DIMENSION(NrOfPrintSteps) :: TimeGrid
       ! VTK file format
       TYPE(VTKInfo), SAVE :: PrintChannelP                                    !< derived datatype to print resolved probability
-
+      ! temporary subarrays for diagonalization
+      INTEGER, DIMENSION(NDim-1) :: Indices
+      REAL, DIMENSION(NDim-1,NDim-1) :: BlockHessian, BlockEigenVec
+      REAL, DIMENSION(NDim-1) :: BlockEigenVal
+      
       
       IF ( PrintType == DEBUG .AND. .NOT. ZPECorrection ) THEN
          ! Open output file to print the brownian realizations of ZH vs time
@@ -335,13 +339,19 @@ MODULE ScatteringSimulation
       END IF
 
       ! Optimize the potential and find the position of the local minimum 
-      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3, GetInitialAsymptoteMask() )
+      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3, &
+             (/ GetInitialAsymptoteMask(), (.TRUE., iCoord=1,NBath ) /) )
       
       ! compute the hessian in mass scaled coordinates
       Hessian(:,:) = GetMassScaledHessian( XEquil ) 
       ! and diagonalize it
-      CALL TheOneWithDiagonalization(Hessian, NormalModesVec, NormalModesVal)
-
+      Indices = (/ GetInitialBoundIndices(), ( NSys+iCoord, iCoord=1,NBath ) /)  
+      BlockHessian = Hessian(Indices,Indices)
+      CALL TheOneWithDiagonalization(BlockHessian, BlockEigenVec, BlockEigenVal )
+      NormalModesVec = 0.0; NormalModesVec(NCoupled,NCoupled) = 1.0; NormalModesVal(NCoupled) = 0.0
+      NormalModesVec(Indices,Indices) = BlockEigenVec
+      NormalModesVal(Indices) = BlockEigenVal
+      
       IF ( .NOT. ZPECorrection ) THEN 
          PRINT "(/,A)" , " Initial conditions for the substrate will be sampled in the normal modes frame of reference"
          PRINT "(A)" ,   " with a classical Boltzmann distribution of harmonic oscillators. "
@@ -897,7 +907,7 @@ MODULE ScatteringSimulation
       REAL, DIMENSION(:), INTENT(OUT)  :: V
       REAL                             ::  Value, CarbonFreq, SigmaV
       INTEGER                          ::  i
-
+      
       ! Check the number degrees of freedom
       CALL ERROR( size(X) /= NDim, "ScatteringSimulation.SubstrateInitialConditions: array dimension mismatch (1)" )
       CALL ERROR( size(V) /= NDim, "ScatteringSimulation.SubstrateInitialConditions: array dimension mismatch (2)" )
@@ -925,7 +935,7 @@ MODULE ScatteringSimulation
             
          ELSE
             ! unbound coordinate (set velocity according to maxwell-boltzman) 
-            X(i) = X(i)
+            X(i) = 0.0
             V(i) = 0.0 !GaussianRandomNr(RandomNr) * SigmaV
 
          ENDIF
@@ -940,7 +950,7 @@ MODULE ScatteringSimulation
          V(i) = V(i) / SQRT( MassVector(i) )
       END DO
       X = X + XEquil
-     
+      
    END SUBROUTINE SubstrateInitialConditions
    
       
