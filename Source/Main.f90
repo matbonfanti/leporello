@@ -240,11 +240,18 @@ PROGRAM leporello
          END IF
 
       CASE( CHAIN_BATH )
-         WRITE(*,901) NBath, MassBath*MassConversion(InternalUnits, InputUnits), MassUnit(InputUnits),   &
-                      BathCutOffFreq*FreqConversion(InternalUnits, InputUnits), FreqUnit(InputUnits),    &
-                      1.0/DynamicsGamma*TimeConversion(InternalUnits, InputUnits), TimeUnit(InputUnits), &
-                      trim(adjustl(SpectralDensityFile))
+         IF (DynamicsGamma /= 0. ) THEN
+            WRITE(*,901) NBath, MassBath*MassConversion(InternalUnits, InputUnits), MassUnit(InputUnits),   &
+                        BathCutOffFreq*FreqConversion(InternalUnits, InputUnits), FreqUnit(InputUnits),    &
+                        1.0/DynamicsGamma*TimeConversion(InternalUnits, InputUnits), TimeUnit(InputUnits), &
+                        trim(adjustl(SpectralDensityFile))
+         ELSE
+            WRITE(*,801) NBath, MassBath*MassConversion(InternalUnits, InputUnits), MassUnit(InputUnits),   &
+                        BathCutOffFreq*FreqConversion(InternalUnits, InputUnits), FreqUnit(InputUnits),    &
+                        trim(adjustl(SpectralDensityFile))
+         END IF
 
+         
       CASE( LANGEVIN_DYN )
          IF (DynamicsGamma /= 0. ) THEN
             WRITE(*,902) 1.0/DynamicsGamma*TimeConversion(InternalUnits, InputUnits), TimeUnit(InputUnits)
@@ -286,6 +293,12 @@ PROGRAM leporello
               " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,& 
               " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,& 
               " * Langevin relax time at the end of the chain: ",F10.4,1X,A,/,&
+              " * File with the spectral density:  "            ,A22,  / )
+   801 FORMAT(" * Bath is is a linear chain of harmonic oscillators ", /,&
+              " * Nr of bath oscillators:                      ",I10,  /,& 
+              " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,& 
+              " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,& 
+              " * Infinite relax time at the end of the chain  ",           /,&
               " * File with the spectral density:  "            ,A22,  / )
 
    902 FORMAT(" * Bath is effectively represented by Langevin dynamics ", /,&
