@@ -78,15 +78,13 @@ MODULE ScatteringSimulation
    ! Random number generator internal status
    TYPE(RNGInternalState), SAVE :: RandomNr    !< spectial type dat to store internal status of random nr generator
 
-!    !> Logical control variable for the log of subroutine StartSystemForScattering
-!    LOGICAL, SAVE  :: LogScattInit = .TRUE.
-
    ! Arrays used for defining initial conditions of the trajectories  
    REAL, ALLOCATABLE, DIMENSION(:)     ::  XEquil             !< Optimized geometry at the asymptotic init channel
    REAL, ALLOCATABLE, DIMENSION(:,:)   ::  Hessian            !< Hessian matrix at XEquil
    REAL, ALLOCATABLE, DIMENSION(:,:)   ::  NormalModesVec     !< Normal modes vectors at XEquil
    REAL, ALLOCATABLE, DIMENSION(:)     ::  NormalModesVal     !< Normal modes squared frequencies at XEquil
-      
+
+
    CONTAINS
 
 !===============================================================================================================================
@@ -297,7 +295,7 @@ MODULE ScatteringSimulation
       IMPLICIT NONE
       ! Output units
       INTEGER :: TEquilUnit, DebugUnitEn, DebugUnitCoord, DebugUnitVel       ! DEBUG
-      INTEGER  ::  CollinearProbUnit, EnergyAverUnit!, CrossSectionUnit, OpacityUnit
+      INTEGER  ::  CollinearProbUnit, EnergyAverUnit, NrmlMdsUnit!, CrossSectionUnit, OpacityUnit
       CHARACTER(100) :: OutFileName                                          ! string to define output file name
       ! Integer indices
       INTEGER  ::  jRho, iTraj, iStep, kStep, iCoord, iChan
@@ -343,34 +341,36 @@ MODULE ScatteringSimulation
       Hessian(:,:) = GetMassScaledHessian( XEquil ) 
       ! and diagonalize it
       CALL TheOneWithDiagonalization(Hessian, NormalModesVec, NormalModesVal)
+
+      IF ( .NOT. ZPECorrection ) THEN 
+         PRINT "(/,A)" , " Initial conditions for the substrate will be sampled in the normal modes frame of reference"
+         PRINT "(A)" ,   " with a classical Boltzmann distribution of harmonic oscillators. "
+         PRINT "(A,/)" , " Initial sampling will be then improved with a Langevin equilibration run. " 
+      ELSE IF ( ZPECorrection ) THEN
+         PRINT "(/,A)" , " Initial conditions for the substrate will be sampled in the normal modes frame of reference"
+         PRINT "(A)" ,   " with microcanonical distribution of coordinates and momenta for a harmonic oscillator"
+         PRINT "(A,/)" , " in the classical orbit of its zero point energy"
+      END IF
+         
+      ! Open output file and print the normal modes of the asymptotic initial geometry
+      IF ( PrintType >= FULL  ) THEN
+
+         NrmlMdsUnit = LookForFreeUnit()
+         OPEN( FILE="NormalModes.dat", UNIT=NrmlMdsUnit )
+         
+         WRITE(NrmlMdsUnit, "(A,/)")  &
+               "# Normal modes frequencies for the initial asymptotic geometry ("//TRIM(FreqUnit(InputUnits))//")"
+         DO iCoord = 1, NDim
+            IF ( NormalModesVal(iCoord) > 0. ) THEN
+               WRITE(NrmlMdsUnit,*) iCoord, SQRT(NormalModesVal(iCoord))*FreqConversion(InternalUnits, InputUnits)
+            ELSE
+               WRITE(NrmlMdsUnit,*) iCoord, SQRT(-NormalModesVal(iCoord))*FreqConversion(InternalUnits, InputUnits), " *i"
+            ENDIF
+         END DO
+         
+         CLOSE( NrmlMdsUnit )
+      END IF   
       
-      !          IF ( LogScattInit ) THEN
-! 
-!               ! PRINT INFO
-!               ! system starts with random displacement around this minimum geometry and random momenta
-!               ! computed in the frame of the normal modes
-!               ! frequencies for the bound states are computed with a normal modes analysis at the minimum
-!               ! here are the frequencies: 
-!               ! i-th normal mode is a bound coordinate of frequency tot
-!               ! j-th degree is a free coordinate of imaginary frequency tot
-!               ! displacement and momenta along the normal modes follow a classical boltzmann distribution 
-!               ! for a harmonic Oscillators
-!               ! or a quasi-classical distribution for a harmonic oscillator at a classical orbit of energy
-!               ! given by the ZPE hbar*omega
-!               
-!               ! -----------------------
-!               
-! !             DO i = 1, NDim
-! !                IF ( NormalModesVal(i) > 0. ) THEN
-! !                   PRINT*, SQRT(NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits)
-! !                ELSE
-! !                   PRINT*, SQRT(-NormalModesVal(i))*FreqConversion(InternalUnits, InputUnits), " *i"
-! !                ENDIF
-! !             END DO
-! 
-!               LogScattInit = .FALSE.
-!               
-!           END IF 
       
       ! scan over the impact parameter... 
       ImpactParameter: DO jRho = 0,NRhoMax
