@@ -351,9 +351,14 @@ MODULE ScatteringSimulation
          PRINT "(A)" ,   " with microcanonical distribution of coordinates and momenta for a harmonic oscillator"
          PRINT "(A,/)" , " in the classical orbit of its zero point energy"
       END IF
-         
+        
+      PotEnergy = ScatteringPotential( XEquil, A )
+      PRINT "(A,F10.4,A)", " Asymptotic minimum of the potential has V equal to ",& 
+                  PotEnergy*EnergyConversion(InternalUnits, InputUnits)," "//TRIM(EnergyUnit(InputUnits))
+ 
       ! Open output file and print the normal modes of the asymptotic initial geometry
       IF ( PrintType >= FULL  ) THEN
+         PRINT "(A)" , " Writing normal modes frequencies to file NormalModes.dat"
 
          NrmlMdsUnit = LookForFreeUnit()
          OPEN( FILE="NormalModes.dat", UNIT=NrmlMdsUnit )
