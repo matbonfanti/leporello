@@ -16,8 +16,7 @@
 !>
 !***************************************************************************************
 PROGRAM leporello
-!    USE MyConsts
-!    USE ErrorTrap
+#include "preprocessoptions.cpp"
    USE SharedData
    USE InputField
    USE UnitConversion
@@ -51,6 +50,8 @@ PROGRAM leporello
    INTEGER :: SpectralDensityUnit
 #endif
 
+   __TIME_STRING__
+   
    PRINT "(/,     '                    ==============================')"
    PRINT "(       '                               leporello          ')"
    PRINT "(       '                    ==============================',/)"
@@ -65,6 +66,11 @@ PROGRAM leporello
    PRINT "(       '                         Voglio far il gentiluomo,    ')"
    PRINT "(       '                        e non voglio più servir... >> '/)"
    PRINT "(       '                      [Don Giovanni act I scene 1]  ',2/)"
+
+#if defined(LOG_FILE) 
+   __INIT_LOG_FILE
+#endif
+   
    CALL date_and_time (values=Time1)
 
    !*************************************************************
@@ -401,6 +407,9 @@ PROGRAM leporello
    WRITE(*,*)
    WRITE(*,"(A,F10.1,A)") " Execution Time : ",TimeDifference( Time2, Time1 )/1000.0, " / s "
    
+#if defined(LOG_FILE) 
+   __END_LOG_FILE
+#endif
    
       CONTAINS
    
