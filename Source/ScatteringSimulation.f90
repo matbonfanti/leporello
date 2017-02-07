@@ -348,7 +348,7 @@ MODULE ScatteringSimulation
       Indices = (/ GetInitialBoundIndices(), ( NSys+iCoord, iCoord=1,NBath ) /)  
       BlockHessian = Hessian(Indices,Indices)
       CALL TheOneWithDiagonalization(BlockHessian, BlockEigenVec, BlockEigenVal )
-      NormalModesVec = 0.0; NormalModesVec(NCoupled,NCoupled) = 1.0; NormalModesVal(NCoupled) = 0.0
+      NormalModesVec = 0.0; NormalModesVec(1,1) = 1.0; NormalModesVal(1) = 0.0
       NormalModesVec(Indices,Indices) = BlockEigenVec
       NormalModesVal(Indices) = BlockEigenVal
       
@@ -376,7 +376,7 @@ MODULE ScatteringSimulation
          WRITE(NrmlMdsUnit, "(A,/)")  &
                "# Normal modes frequencies for the initial asymptotic geometry ("//TRIM(FreqUnit(InputUnits))//")"
          DO iCoord = 1, NDim
-            IF ( NormalModesVal(iCoord) > 0. ) THEN
+            IF ( NormalModesVal(iCoord) >= 0. ) THEN
                WRITE(NrmlMdsUnit,*) iCoord, SQRT(NormalModesVal(iCoord))*FreqConversion(InternalUnits, InputUnits)
             ELSE
                WRITE(NrmlMdsUnit,*) iCoord, SQRT(-NormalModesVal(iCoord))*FreqConversion(InternalUnits, InputUnits), " *i"
