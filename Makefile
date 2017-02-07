@@ -13,10 +13,10 @@ LOGFILE = yes
 LOGNAME = leporello.log
 
 # Compiler ( gfortran, ifort )
-FC = ifort
+FC = gfortran
 
 # Debugging options ( yes or no )
-DEBUG =  yes 
+DEBUG =  no  
 
 # Optimization level
 OPTLEVEL = 3
@@ -108,6 +108,8 @@ ifeq (${FC},gfortran)
    # Flag to specify the position of mod files
    MODULEFLG = -fintrinsic-modules-path
 
+   # Other miscellaneous compiling options
+   MISCFLG = -ffree-line-length-none
 endif
 
 ifeq (${FC},ifort)
@@ -175,6 +177,8 @@ ifeq (${FC},ifort)
    # Flag to specify the position of mod files
    MODULEFLG = -I
 
+   # Other miscellaneous compiling options
+   MISCFLG = 
 endif
 
 ifeq (${FC},fermi)
@@ -216,6 +220,8 @@ ifeq (${FC},fermi)
    # Flag to specify the position of mod files
    MODULEFLG = -I
 
+   # Other miscellaneous compiling options
+   MISCFLG = 
 endif
 
 ifeq (${FC},hilbert)
@@ -251,6 +257,8 @@ ifeq (${FC},hilbert)
    # Flag to specify the position of mod files
    MODULEFLG = -I
 
+   # Other miscellaneous compiling options
+   MISCFLG = 
 endif
 
 ifeq (${FC},galileo)
@@ -287,6 +295,8 @@ ifeq (${FC},galileo)
    # Flag to specify the position of mod files
    MODULEFLG = -I
 
+   # Other miscellaneous compiling options
+   MISCFLG = 
 endif
 
 
@@ -362,6 +372,7 @@ ifeq (${OPENMP}, yes)
    COMPILEFLG += ${OPENMPFLG}
 endif
 
+COMPILEFLG += ${MISCFLG}
 
 #----------------------------------------------------------------------------
 #              Determine the optimization level to be used.
