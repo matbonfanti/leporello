@@ -303,6 +303,7 @@ MODULE PotentialModule
 
          INTEGER, PARAMETER   ::  SCATTERING       = 1
          INTEGER, PARAMETER   ::  ASYMPTOTIC_START = 2
+         INTEGER, PARAMETER   ::  ASYMPTOTIC_END   = 3
         
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.StartSystemForScattering : module not set" )
@@ -323,7 +324,15 @@ MODULE PotentialModule
             CASE ( SCATTERING )
                X(1) = InitDist
                V(1) = -SQRT( 2.0 * InitEKin / M(1) )
-               
+
+            ! In case of a ASYMPTOTIC_END task, the scatterer and the target are placed far from the carbon, 
+            ! at the H2 equil distance, the substrate is placed in Z = 0 position
+            CASE ( ASYMPTOTIC_END )       
+                X(1) = InitDist
+                X(2) = InitDist-H2EqD
+                IF (NDim == 3) X(3) = 0.0
+                
+
             CASE DEFAULT
                CALL AbortWithError( "PotentialModule.StartSystemForScattering : Task is not defined" )
                

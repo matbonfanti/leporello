@@ -313,6 +313,7 @@ MODULE ScatteringSimulation
       INTEGER, DIMENSION(NDim-1) :: Indices
       REAL, DIMENSION(NDim-1,NDim-1) :: BlockHessian, BlockEigenVec
       REAL, DIMENSION(NDim-1) :: BlockEigenVal
+      REAL, DIMENSION(NDim) :: FinalEigenVal
       
       
       IF ( PrintType == DEBUG .AND. .NOT. ZPECorrection ) THEN
@@ -328,7 +329,25 @@ MODULE ScatteringSimulation
 
       PRINT "(A,I5,A,I5,A)"," Running ", NrTrajs, " trajectories per ",NRhoMax+1," impact parameters ... "
 
+      ! Compute the normal modes at the minimum of the asymptotic out configuration
       
+      ! Put system in the final scattering equilibrium geometry...
+      CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), 2000., 0.0, 0.0, Task=3 )
+      ! ... and the rest of the degrees of freedom in a good guess for initial minimum
+      IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
+         X(NSys+1:) = 0.0
+      END IF
+      
+      ! Optimize the potential and find the position of the local minimum 
+      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3 )
+
+      ! compute the hessian in mass scaled coordinates
+      Hessian(:,:) = GetMassScaledHessian( XEquil ) 
+      ! and diagonalize it
+      Indices = (/ GetInitialBoundIndices(), ( NSys+iCoord, iCoord=1,NBath ) /)  
+      BlockHessian = Hessian(Indices,Indices)
+      CALL TheOneWithDiagonalization(Hessian, NormalModesVec, FinalEigenVal )
+
       ! Compute the normal modes at the minimum of the asymptotic incoming configuration
       
       ! Put initial scatterer asymptotically...
@@ -380,6 +399,15 @@ MODULE ScatteringSimulation
                WRITE(NrmlMdsUnit,*) iCoord, SQRT(NormalModesVal(iCoord))*FreqConversion(InternalUnits, InputUnits)
             ELSE
                WRITE(NrmlMdsUnit,*) iCoord, SQRT(-NormalModesVal(iCoord))*FreqConversion(InternalUnits, InputUnits), " *i"
+            ENDIF
+         END DO
+         WRITE(NrmlMdsUnit, "(/,A,/)")  &
+               "# Normal modes frequencies for the final asymptotic geometry ("//TRIM(FreqUnit(InputUnits))//")"
+         DO iCoord = 1, NDim
+            IF ( NormalModesVal(iCoord) >= 0. ) THEN
+               WRITE(NrmlMdsUnit,*) iCoord, SQRT(FinalEigenVal(iCoord))*FreqConversion(InternalUnits, InputUnits)
+            ELSE
+               WRITE(NrmlMdsUnit,*) iCoord, SQRT(-FinalEigenVal(iCoord))*FreqConversion(InternalUnits, InputUnits), " *i"
             ENDIF
          END DO
          
