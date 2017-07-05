@@ -1,7 +1,7 @@
 !***************************************************************************************
 !*                              PROGRAM leporello
 !***************************************************************************************
-!>  \mainpage      Program leporello 
+!>  \mainpage      Program leporello
 !>
 !>  Classical simulations of H + H + C(graphene) + dissipative bath       \n
 !>  * Model: 1D for Hinc + 1D for Htar + 1D Z coordinate for carbon atom  \n
@@ -9,7 +9,7 @@
 !>  * Propagation: Velocity-Verlet in the microcanonical ensamble         \n
 !>                 symplectic in the canonical ensamble                   \n
 !>
-!>  \author        Matteo Bonfanti 
+!>  \author        Matteo Bonfanti
 !>  \version       1.0
 !>  \date          9 February 2013
 !>
@@ -33,7 +33,7 @@ PROGRAM leporello
    ! Variable to handle the command line
    INTEGER :: NArgs
    LOGICAL :: Help = .FALSE.
-   
+
    ! Input file name, set from command line arguments
    CHARACTER(120) :: InputFileName
 
@@ -51,13 +51,13 @@ PROGRAM leporello
 #endif
 
    __TIME_STRING__
-   
+
    PRINT "(/,     '                    ==============================')"
    PRINT "(       '                               leporello          ')"
    PRINT "(       '                    ==============================',/)"
    PRINT "(       '                       Author: Matteo Bonfanti'      )"
    PRINT "(       '                       Release: ',A)", VERSIONTAG
-   PRINT "(       '                       Compilation: ',A,1X,A,/)", __DATE__, __TIME__ 
+   PRINT "(       '                       Compilation: ',A,1X,A,/)", __DATE__, __TIME__
 
    PRINT "(       '                       << Notte e giorno faticar      ')"
    PRINT "(       '                         per chi nulla sa gradir      ')"
@@ -67,10 +67,10 @@ PROGRAM leporello
    PRINT "(       '                        e non voglio più servir... >> '/)"
    PRINT "(       '                      [Don Giovanni act I scene 1]  ',2/)"
 
-#if defined(LOG_FILE) 
+#if defined(LOG_FILE)
    __INIT_LOG_FILE
 #endif
-   
+
    CALL date_and_time (values=Time1)
 
    !*************************************************************
@@ -92,7 +92,7 @@ PROGRAM leporello
    ENDIF
 
    !*************************************************************
-   !         INPUT SECTION 
+   !         INPUT SECTION
    !*************************************************************
 
    ! Open and read from input file the input parameters of the calculation
@@ -135,7 +135,11 @@ PROGRAM leporello
    CALL SetFieldFromInput( InputData, "MassC", MassC )
    MassC = MassC * MassConversion(InputUnits, InternalUnits)
 
-   ! SET THE BATH-REPRESENTATION DEPENDENT VARIABLES 
+   ! Type of potential for the system
+   CALL SetFieldFromInput( InputData, "SystemPotType", InputVType )
+   CALL CheckSystemPotentialType( InputVType )
+
+   ! SET THE BATH-REPRESENTATION DEPENDENT VARIABLES
 
    IF ( BathType == NORMAL_BATH ) THEN
 
@@ -145,7 +149,7 @@ PROGRAM leporello
       CALL SetFieldFromInput( InputData, "MassBath", MassBath )
       MassBath = MassBath * MassConversion(InputUnits, InternalUnits)
       ! Nr of bath degrees of freedom
-      CALL SetFieldFromInput( InputData, "NBath",  NBath ) 
+      CALL SetFieldFromInput( InputData, "NBath",  NBath )
       ! Read ohmic spectral density, when zero read spectral density from file
       CALL SetFieldFromInput( InputData, "OhmicGammaTimesMass", OhmicGammaTimesMass, 0.0 )
       IF ( OhmicGammaTimesMass /= 0 ) THEN
@@ -158,10 +162,10 @@ PROGRAM leporello
          ! Read cutoff frequency of the bath, if BathCutOffFreq is not present, it is set to zero
          CALL SetFieldFromInput( InputData, "BathCutOffFreq", BathCutOffFreq, 0.0 )
       END IF
-      BathCutOffFreq = BathCutOffFreq * FreqConversion(InputUnits, InternalUnits) 
+      BathCutOffFreq = BathCutOffFreq * FreqConversion(InputUnits, InternalUnits)
       ! Set lower boundary for oscillator bath frequency
       CALL SetFieldFromInput( InputData, "BathLowerCutOffFreq", BathLowerCutOffFreq, 0.0 )
-      BathLowerCutOffFreq = BathLowerCutOffFreq * FreqConversion(InputUnits, InternalUnits) 
+      BathLowerCutOffFreq = BathLowerCutOffFreq * FreqConversion(InputUnits, InternalUnits)
       ! Set non linear system-bath coupling
       CALL SetFieldFromInput( InputData, "NonLinearCoupling", NonLinearCoupling, .FALSE. )
       IF ( NonLinearCoupling ) THEN
@@ -172,7 +176,7 @@ PROGRAM leporello
    ELSE IF ( BathType == CHAIN_BATH ) THEN
 
       ! Langevin relaxation at the end of the chain
-      CALL SetFieldFromInput( InputData, "RelaxAtChainEnd",  DynamicsGamma, 0.0 ) 
+      CALL SetFieldFromInput( InputData, "RelaxAtChainEnd",  DynamicsGamma, 0.0 )
       IF ( DynamicsGamma /= 0 ) &
          DynamicsGamma = 1. / ( DynamicsGamma * TimeConversion(InputUnits, InternalUnits) )
       ! Mass of the bath oscillator
@@ -182,14 +186,14 @@ PROGRAM leporello
       CALL SetFieldFromInput( InputData, "NBath",  NBath )
       ! Read cutoff frequency of the bath, if BathCutOffFreq is not present, it is set to zero
       CALL SetFieldFromInput( InputData, "BathCutOffFreq", BathCutOffFreq, 0.0 )
-      BathCutOffFreq = BathCutOffFreq * FreqConversion(InputUnits, InternalUnits) 
+      BathCutOffFreq = BathCutOffFreq * FreqConversion(InputUnits, InternalUnits)
       ! Read file with normal modes freq and couplings
       CALL SetFieldFromInput( InputData, "SpectralDensityFile", SpectralDensityFile )
 
    ELSE IF ( BathType == LANGEVIN_DYN ) THEN
 
       ! Langevin relaxation of the system (at the carbon atom)
-      CALL SetFieldFromInput( InputData, "RelaxAtCarbon",  DynamicsGamma, 0.0 ) 
+      CALL SetFieldFromInput( InputData, "RelaxAtCarbon",  DynamicsGamma, 0.0 )
       IF ( DynamicsGamma /= 0 ) &
          DynamicsGamma = 1. / ( DynamicsGamma * TimeConversion(InputUnits, InternalUnits) )
 
@@ -203,6 +207,8 @@ PROGRAM leporello
    CALL ERROR( SuddenV .AND. AdiabaticV, " impossible to choose adiabatic and sudden pot at the same time ")
    CALL ERROR( (SuddenV .OR. AdiabaticV) .AND. (BathType /= LANGEVIN_DYN .OR. DynamicsGamma /= 0), &
              " adiabatic and sudden pot available only for system-only microcanonical dynamics" )
+   CALL ERROR( (SuddenV .OR. AdiabaticV) .AND. (TRIM(ADJUSTL(InputVType)) /= "vEleyRideal_3D"), &
+             " adiabatic and sudden pot available only for 3d eley-rideal potential" )
 
    !*************************************************************
    !       PRINT OF THE INPUT DATA TO STD OUT
@@ -227,7 +233,7 @@ PROGRAM leporello
    ! Write info about the bath representation
    SELECT CASE( BathType )
 
-      CASE( NORMAL_BATH ) 
+      CASE( NORMAL_BATH )
          IF ( OhmicGammaTimesMass == 0.0 ) THEN
             WRITE(*,900) NBath, MassBath*MassConversion(InternalUnits, InputUnits), MassUnit(InputUnits), &
                          BathCutOffFreq*FreqConversion(InternalUnits, InputUnits), FreqUnit(InputUnits),  &
@@ -251,12 +257,12 @@ PROGRAM leporello
                         trim(adjustl(SpectralDensityFile))
          END IF
 
-         
+
       CASE( LANGEVIN_DYN )
          IF (DynamicsGamma /= 0. ) THEN
             WRITE(*,902) 1.0/DynamicsGamma*TimeConversion(InternalUnits, InputUnits), TimeUnit(InputUnits)
          ELSE
-            WRITE(*,802) 
+            WRITE(*,802)
          END IF
 
    END SELECT
@@ -276,28 +282,28 @@ PROGRAM leporello
               " * Mass of the C atom:                          ",F10.4,1X,A,/ )
 
    900 FORMAT(" * Bath is a set of independent HO coupled to the system ",/,&
-              " * Nr of bath oscillators:                      ",I10,  /,& 
-              " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,& 
-              " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,& 
-              " * Lower cutoff frequency:                      ",F10.1,1X,A,/,& 
+              " * Nr of bath oscillators:                      ",I10,  /,&
+              " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,&
+              " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,&
+              " * Lower cutoff frequency:                      ",F10.1,1X,A,/,&
               " * File with the spectral density:  "            ,A22,/ )
 
    910 FORMAT(" * Bath is a set of independent HO coupled to the system, ohmic SD ",/,&
-              " * Nr of bath oscillators:                      ",I10,  /,& 
-              " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,& 
-              " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,& 
+              " * Nr of bath oscillators:                      ",I10,  /,&
+              " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,&
+              " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,&
               " * Relaxation time of the ohmic SD              ",F10.4,1X,"au",/ )
 
    901 FORMAT(" * Bath is is a linear chain of harmonic oscillators ", /,&
-              " * Nr of bath oscillators:                      ",I10,  /,& 
-              " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,& 
-              " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,& 
+              " * Nr of bath oscillators:                      ",I10,  /,&
+              " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,&
+              " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,&
               " * Langevin relax time at the end of the chain: ",F10.4,1X,A,/,&
               " * File with the spectral density:  "            ,A22,  / )
    801 FORMAT(" * Bath is is a linear chain of harmonic oscillators ", /,&
-              " * Nr of bath oscillators:                      ",I10,  /,& 
-              " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,& 
-              " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,& 
+              " * Nr of bath oscillators:                      ",I10,  /,&
+              " * Mass of the bath oscillator:                 ",F10.4,1X,A,/,&
+              " * Cutoff frequency of the bath:                ",F10.1,1X,A,/,&
               " * Infinite relax time at the end of the chain  ",           /,&
               " * File with the spectral density:  "            ,A22,  / )
 
@@ -307,22 +313,22 @@ PROGRAM leporello
               " * Infinite relaxation time                             ", / )
 
    !*************************************************************
-   !       POTENTIAL SETUP 
+   !       POTENTIAL SETUP
    !*************************************************************
 
    ! Setup potential energy surface
    IF ( AdiabaticV ) THEN
-      CALL SetupPotential( ADIABATIC, DerivTesting  )
-   ELSE IF ( SuddenV ) THEN 
-      CALL SetupPotential( SUDDEN,    DerivTesting  )
+      CALL SetupPotential( InputVType, ADIABATIC, DerivTesting  )
+   ELSE IF ( SuddenV ) THEN
+      CALL SetupPotential( InputVType, SUDDEN,    DerivTesting  )
    ELSE
-      CALL SetupPotential( FULLPOT,   DerivTesting  )
+      CALL SetupPotential( InputVType, FULLPOT,   DerivTesting  )
    END IF
 
    !*************************************************************
-   !       IO BATH SETUP 
+   !       IO BATH SETUP
    !*************************************************************
-   
+
    ! If needed setup bath frequencies and coupling for oscillator bath models
    IF (  BathType == NORMAL_BATH ) THEN
          IF ( OhmicGammaTimesMass == 0.0 ) THEN
@@ -334,7 +340,7 @@ PROGRAM leporello
    ELSE IF (  BathType == CHAIN_BATH ) THEN
          CALL SetupIndepOscillatorsModel( Bath, NBath, 1, SpectralDensityFile, MassBath, BathCutOffFreq )
    END IF
-   
+
    IF  ( BathType == NORMAL_BATH .OR. BathType == CHAIN_BATH ) &
       PRINT "(/,A,F10.6,A,/)"," * Bath distorsion force constant:              ", GetDistorsionForce( Bath ), " au"
 
@@ -356,13 +362,13 @@ PROGRAM leporello
 
       DO iBath = 1, Bath%BathSize
          WRITE(SpectralDensityUnit,"(2F20.12)") Bath%Frequencies(iBath)*FreqConversion(InternalUnits,InputUnits),&
-                        Bath%Couplings(iBath) 
+                        Bath%Couplings(iBath)
       END DO
-      WRITE(SpectralDensityUnit,"(/)") 
+      WRITE(SpectralDensityUnit,"(/)")
 #endif
 
    !*************************************************************
-   !       SPECIFIC INPUT SECTION 
+   !       SPECIFIC INPUT SECTION
    !*************************************************************
 
    SELECT CASE( RunType )
@@ -379,7 +385,7 @@ PROGRAM leporello
    CALL CloseFile( InputData )
 
    !*************************************************************
-   !       INITIALIZE AND RUN CALCULATION 
+   !       INITIALIZE AND RUN CALCULATION
    !*************************************************************
 
    SELECT CASE( RunType )
@@ -416,28 +422,28 @@ PROGRAM leporello
       CALL DisposeIndepOscillatorsModel( Bath )
 
    CALL date_and_time (values=Time2)
-   
+
    WRITE(*,*)
    WRITE(*,"(A,F10.1,A)") " Execution Time : ",TimeDifference( Time2, Time1 )/1000.0, " / s "
-   
-#if defined(LOG_FILE) 
+
+#if defined(LOG_FILE)
    __END_LOG_FILE
 #endif
-   
+
       CONTAINS
-   
+
    FUNCTION TimeDifference( Time1, Time2 )
-      INTEGER, DIMENSION(8), INTENT(IN)    :: Time1, Time2         
+      INTEGER, DIMENSION(8), INTENT(IN)    :: Time1, Time2
       REAL :: TimeDifference
-   
+
       TimeDifference =  (Time1(3)-Time2(3))*24.0*60.0*60.0*1000. + &
                         (Time1(5)-Time2(5))*60.0*60.0*1000. + &
                         (Time1(6)-Time2(6))*60.0*1000. + &
                         (Time1(7)-Time2(7))*1000. + &
                         (Time1(8)-Time2(8))
-         
+
    END FUNCTION TimeDifference
-   
+
 END PROGRAM leporello
 
 

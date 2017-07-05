@@ -17,21 +17,21 @@ MODULE SharedData
 
 !=============================================================================================================
 
-   ! PARAMETERS 
-   
+   ! PARAMETERS
+
    ! Variable to define adsorption condition
    REAL, PARAMETER :: AdsorpLimit = 5.0
 
 !=============================================================================================================
 
    ! VARIABLES SET FROM INPUT
-   
-   !> Variable to define which kind of calculation is required 
+
+   !> Variable to define which kind of calculation is required
    INTEGER :: RunType
    INTEGER, PARAMETER :: EQUILIBRIUM      = 1,  & ! Equilibrium calculation with H already adsorbed
                          RELAXATION       = 2,  & ! Relaxation dynamics of a CH bound state, with the bath at 0K
                          SCATTERING       = 4,  & ! Scattering calculation with H coming from gas-phase
-                         POTENTIAL        = 10    ! Static analysis of the potential 
+                         POTENTIAL        = 10    ! Static analysis of the potential
 
    !> Variable to set the print level of the calculation
    INTEGER :: PrintType
@@ -46,10 +46,13 @@ MODULE SharedData
                          LANGEVIN_DYN   = 1      ! effective relaxation dynamics, with langevin eq of motion
 
    !> Gamma of the relaxation during dynamics (its meaning depends on the bath representation)
-   REAL    :: DynamicsGamma             
+   REAL    :: DynamicsGamma
 
    !> Logical variable to perform the tests on the derivatives of the potential !!! the code is terminated after the tests !!!
    LOGICAL :: DerivTesting
+
+   !> String specifying the type of potential to be used in the dynamics
+   CHARACTER(20) :: InputVType
 
    ! Logical variables to set reductions of the full potential energy surface
    LOGICAL :: AdiabaticV                !< adiabatic approximation on the potential
@@ -72,8 +75,8 @@ MODULE SharedData
    REAL           :: OhmicGammaTimesMass       !< Gamma of an ohmic spectral density of the bath
    LOGICAL        :: NonLinearCoupling         !< system - bath coupling is non linear
    REAL           :: AlphaCoupling             !< paramter in non linear system-bath coupling
- 
-   ! POSITION, VELOCITY, ACCELERATION 
+
+   ! POSITION, VELOCITY, ACCELERATION
 
    REAL, DIMENSION(:), ALLOCATABLE :: X    !< Position at given timestep
    REAL, DIMENSION(:), ALLOCATABLE :: V    !< Velocity at given timestep
@@ -82,14 +85,14 @@ MODULE SharedData
    ! VECTOR WITH THE MASSES
 
    REAL, DIMENSION(:), ALLOCATABLE :: MassVector         !< Vector with the masses of the system
-   
+
 CONTAINS
 
    !> Subroutine to check the availability of a given runtype option
    SUBROUTINE CheckRunType( IntNr )
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: IntNr
-      LOGICAL :: Check 
+      LOGICAL :: Check
 
       Check = ( IntNr /= EQUILIBRIUM .AND. &
                 IntNr /= RELAXATION .AND. &
@@ -102,7 +105,7 @@ CONTAINS
    SUBROUTINE CheckPrintType( IntNr )
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: IntNr
-      LOGICAL :: Check 
+      LOGICAL :: Check
 
       Check = ( IntNr /= DEBUG .AND. &
                 IntNr /= FULL .AND. &
@@ -114,12 +117,23 @@ CONTAINS
    SUBROUTINE CheckBathType( IntNr )
       IMPLICIT NONE
       INTEGER, INTENT(IN) :: IntNr
-      LOGICAL :: Check 
+      LOGICAL :: Check
 
       Check = ( IntNr /= NORMAL_BATH .AND. &
                 IntNr /= CHAIN_BATH .AND. &
                 IntNr /= LANGEVIN_DYN  )
       CALL ERROR( Check, " SharedData.CheckBathType: Invalid BathType option " )
    END SUBROUTINE CheckBathType
+
+   !> Subroutine to check the availability of a given InputVType option
+   SUBROUTINE CheckSystemPotentialType( InputVType )
+      IMPLICIT NONE
+      CHARACTER(20), INTENT(IN) :: InputVType
+      LOGICAL :: Check
+
+      Check = ( TRIM(ADJUSTL(InputVType)) /= "vEleyRideal_3D" .AND. &
+                TRIM(ADJUSTL(InputVType)) /= "vEleyRideal_7D" )
+      CALL ERROR( Check, " SharedData.CheckSystemPotentialType: Invalid InputVType option " )
+   END SUBROUTINE CheckSystemPotentialType
 
 END MODULE SharedData
