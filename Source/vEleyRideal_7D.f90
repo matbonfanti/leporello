@@ -1,8 +1,8 @@
 
-  !-------------------ER_3D------------------------------ 
-  !    Subroutine to compute the 7D potential 
+  !-------------------ER_3D------------------------------
+  !    Subroutine to compute the 7D potential
   !        for the ER reaction.
-  !        DOFs = incidon x, y, z; 
+  !        DOFs = incidon x, y, z;
   !               targon x, y, z;
   !               carbon z.
   !------------------------------------------------------
@@ -21,7 +21,7 @@
   REAL*8, PARAMETER :: di = 0.00775d0	!incidon potential well, in eV
   REAL*8, PARAMETER :: alphai = 0.954d0	!incidon curvature, in Ang(-1)
   REAL*8, PARAMETER :: ai = 4.01d0	!incidon eq. position, in Ang
-  REAL*8, PARAMETER :: deltai = -0.80d0	
+  REAL*8, PARAMETER :: deltai = -0.80d0
 
   !LEPS parameters for the target atom
   REAL*8, PARAMETER :: dt = 1.55d0	!targon potential well, in eV
@@ -108,7 +108,7 @@
   !compute the molecular terms and their derivatives respect to r
 
   !definition of r = sqrt( (xi-xt)**2 + (yi-yt)**2 + (zi-zt)**2 )
-  r = sqrt( (dof(1)-dof(4))*2+(dof(2)-dof(5))**2+(dof(3)-dof(6))**2)
+  r = sqrt( (dof(1)-dof(4))**2+(dof(2)-dof(5))**2+(dof(3)-dof(6))**2)
 
   fm = exp(-alpha2m*(r-am)/(1+exp(-betam*(r-bm))))
 
@@ -169,7 +169,7 @@
   CALL hstick( dof(4),dof(5),dof(6),dof(7), vstick, dvstick_dxt, dvstick_dyt, dvstick_dzt, dvstick_dzc )
 
   !full potential
-  vv = vdiab - vmorse + vstick 
+  vv = vdiab - vmorse + vstick
 
 
   ! derivatives of r wrt the subsystem DOFs
@@ -193,7 +193,7 @@
 
   dv(5) =         + dv_r * dr_dyt + dvstick_dyt   !dV/dyt = dV/dr * dr/dyt + dVstick/dyt
 
-  dv(6) = + dv_rt + dv_r * dr_dzt + dvstick_dzt   !dV/dzt 
+  dv(6) = + dv_rt + dv_r * dr_dzt + dvstick_dzt   !dV/dzt
 
   dv(7) = - dv_ri - dv_rt         + dvstick_dzc   !dV/dzc
 
@@ -208,22 +208,22 @@
 
 !convert the full potential in eV
 !  vv = vv * MyConsts_Hartree2eV
-  
 
-  CONTAINS        
 
-   SUBROUTINE hstick( rhx, rhy, rhz, rcz ,vv, dv_rhx, dv_rhy, dv_rhz, dv_rcz ) 
+  CONTAINS
+
+   SUBROUTINE hstick( rhx, rhy, rhz, rcz ,vv, dv_rhx, dv_rhy, dv_rhz, dv_rcz )
       IMPLICIT NONE
       REAL*8, INTENT(IN)  :: rhx, rhy, rhz, rcz
       REAL*8, INTENT(OUT) :: vv, dv_rhx, dv_rhy, dv_rhz, dv_rcz
 
-      REAL*8, PARAMETER    :: MyConsts_Bohr2Ang       = 0.52917721092d0  !< Conversion factor from Bohr to Ang (from NIST )      
+      REAL*8, PARAMETER    :: MyConsts_Bohr2Ang       = 0.52917721092d0  !< Conversion factor from Bohr to Ang (from NIST )
       REAL*8, PARAMETER    :: MyConsts_Hartree2eV     = 27.21138505d0    !< Conversion factor from Hartree to eV (from NIST )
       REAL*8, PARAMETER :: di = 0.00775d0           !< potential well (eV)
       REAL*8, PARAMETER :: alphi = 0.954d0          !< curvature (Ang-1)
       REAL*8, PARAMETER :: ai = 4.01d0              !< equilibrium position (Ang)
       ! parameters to describe the behaviour along rho at large rho
-      REAL*8, PARAMETER :: alp = 1.4d0              !< a_f in the text (Ang-1) 
+      REAL*8, PARAMETER :: alp = 1.4d0              !< a_f in the text (Ang-1)
       REAL*8, PARAMETER :: alp2 = 1.65d0            !< b_f in the text (Ang-1)
       REAL*8, PARAMETER :: ba = 2.9d0               !< c_f in the text (Ang-1)
       REAL*8, PARAMETER :: rhoa = 1.0d0             !< rho_f in the text (Ang)
@@ -264,7 +264,7 @@
 !                           POTENTIAL FOR THE C-H SYSTEM
 ! **************************************************************************************************
 
-      ! Compute the parameters for the morse + gaussian 
+      ! Compute the parameters for the morse + gaussian
       ! functional form for the collinear potential
 
       ! D_0 is the morse depth (eV)
@@ -289,20 +289,20 @@
       ! C_2 is the gaussian height (eV)
       c2= 0.3090344*exp(-2.741813*(sub2-0.2619756))+            &
       0.03113325*exp(3.1844857*(sub2-0.186741))+                &
-      0.02*exp(-20.0*(sub2-0.1)**2) 
+      0.02*exp(-20.0*(sub2-0.1)**2)
       dc2dzc=-0.8473145*exp(-2.741813*(sub2-0.2619756))+        &
       0.0991434*exp(3.1844857*(sub2-0.186741))+(                &
       -0.8*(sub2-0.1)*exp(-20.0*(sub2-0.1)**2))
 
       ! B is the gaussian curvature (Ang-2)
-      b=4.00181*exp(1.25965*(sub2-0.58729)) 
+      b=4.00181*exp(1.25965*(sub2-0.58729))
       dbdzc=5.0408799*exp(1.25965*(sub2-0.58729))
 
       ! Z_G is the center of the gaussian (Ang)
       zg=1.99155*(sub2)+1.46095
       dzgdzc=1.99155
 
-      ! Compute the potential and the derivatives of the 
+      ! Compute the potential and the derivatives of the
       ! collinear potential V_0
 
       v=c1+(c1+d0)*(exp(-2.0*a*(sub1-zm))-2.0*exp(-a*(sub1-zm)))+       &
@@ -319,7 +319,7 @@
       (-c2*dbdzc*(sub1-zg)**2+c2*b*2.0*(sub1-zg)*dzgdzc)*       &
       exp(-b*(sub1-zg)**2)
 
-      ! Compute the force constant (and derivatives) for small rho 
+      ! Compute the force constant (and derivatives) for small rho
       ! potential rkrho(zh-q,zc-q)
 
       rkrho=3.866259*exp(-17.038588*(sub2-0.537621)**2+         &
@@ -374,7 +374,7 @@
       ! Total H,C1 potential/derivatives
 
       vt=vq*(1.0-sw)+ff3*sw
-   
+
       df2dr=-2.0*alp*exp(-2.0*alp*rho)-                &
          2.0*exp(-alp*rho)*exp(-alp2*rho/ff1)*       &
          (-alp-(alp2/ff1)-alp2*rho*ba*fexp/(ff1**2))
@@ -402,12 +402,12 @@
       dv_rhz=dvtds1
       dv_rcz=dvtds2
 
-      ! Transform forces in atomic units (from eV Ang^-1 to Hartree Bohr^-1) 
+      ! Transform forces in atomic units (from eV Ang^-1 to Hartree Bohr^-1)
       dv_rhx = dv_rhx * MyConsts_Bohr2Ang / MyConsts_Hartree2eV
       dv_rhy = dv_rhy * MyConsts_Bohr2Ang / MyConsts_Hartree2eV
       dv_rhz = dv_rhz * MyConsts_Bohr2Ang / MyConsts_Hartree2eV
       dv_rcz = dv_rcz * MyConsts_Bohr2Ang / MyConsts_Hartree2eV
 
    END SUBROUTINE hstick
-END SUBROUTINE 
+END SUBROUTINE
 
