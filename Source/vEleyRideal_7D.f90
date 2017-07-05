@@ -42,7 +42,7 @@
   REAL*8, PARAMETER :: bm = 1.89d0	!in Ang
 
   !temporary variables to store the different terms of the potential
-  REAL*8 :: ft, fm, ui, ut, um, qi, qt, qm, r
+  REAL*8 :: ft, fm, ui, ut, um, qi, qt, qm, r, r_bohr
 
   !potential derivatives
   REAL*8 :: d_ui, d_qi, d_ut, d_qt, d_um, d_qm
@@ -108,7 +108,8 @@
   !compute the molecular terms and their derivatives respect to r
 
   !definition of r = sqrt( (xi-xt)**2 + (yi-yt)**2 + (zi-zt)**2 )
-  r = sqrt( (dof(1)-dof(4))**2+(dof(2)-dof(5))**2+(dof(3)-dof(6))**2)
+  r_bohr = sqrt( (dof(1)-dof(4))**2+(dof(2)-dof(5))**2+(dof(3)-dof(6))**2)
+  r = r_bohr * MyConsts_Bohr2Ang
 
   fm = exp(-alpha2m*(r-am)/(1+exp(-betam*(r-bm))))
 
@@ -174,12 +175,12 @@
 
   ! derivatives of r wrt the subsystem DOFs
 
-  dr_dxi = (dof(1) - dof(4)) / sqrt(r)
-  dr_dyi = (dof(2) - dof(5)) / sqrt(r)
-  dr_dzi = (dof(3) - dof(6)) / sqrt(r)
-  dr_dxt = (dof(4) - dof(1)) / sqrt(r)
-  dr_dyt = (dof(5) - dof(2)) / sqrt(r)
-  dr_dzt = (dof(6) - dof(3)) / sqrt(r)
+  dr_dxi = (dof(1) - dof(4)) / r_bohr
+  dr_dyi = (dof(2) - dof(5)) / r_bohr
+  dr_dzi = (dof(3) - dof(6)) / r_bohr
+  dr_dxt = (dof(4) - dof(1)) / r_bohr
+  dr_dyt = (dof(5) - dof(2)) / r_bohr
+  dr_dzt = (dof(6) - dof(3)) / r_bohr
 
   ! sum derivatives
   !derivatives of the potential wrt subsytem dofs
