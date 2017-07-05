@@ -19,6 +19,12 @@ PrintType : 2
 # 3 - NORMAL BATH bath of HO on a regular freq grid, all coupled to the system
 BathType : 1
 
+# SYSTEM POTENTIAL
+# "vEleyRideal_3D" - 3D eley-rideal potential including carbon atom
+# "vEleyRideal_7D" - 7D extension of the 3D eley-rideal potential including lateral displacemnts
+SystemPotType : vEleyRideal_7D
+DerivTesting : TRUE
+
 # Units
 # Length: 0 = bohr, 1 = Ang
 InputLength : 1
