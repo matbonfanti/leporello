@@ -16,7 +16,7 @@ LOGNAME = leporello.log
 FC = gfortran
 
 # Debugging options ( yes or no )
-DEBUG =  no  
+DEBUG =  yes 
 
 # Optimization level
 OPTLEVEL = 3
@@ -80,7 +80,7 @@ ifeq (${FC},gfortran)
    O3FLAGS  = -O3
 
    # Debug flag
-   DEBUGFLG = -g -fbounds-check
+   DEBUGFLG = -g -fbounds-check -ffpe-trap=invalid,zero,overflow,underflow
 
    # LAPACK AND BLAS flags
    ifeq (${GLAPACK},GNU)
@@ -476,6 +476,10 @@ ${OBJDIR}/vEleyRideal_3D.o : ${SRCDIR}/vEleyRideal_3D.f90
 	${COMPILE} ${SRCDIR}/vEleyRideal_3D.f90 
 	cp -p vEleyRideal_3D.o ${OBJDIR}
 	rm vEleyRideal_3D.o
+${OBJDIR}/vEleyRideal_7D.o : ${SRCDIR}/vEleyRideal_7D.f90
+	${COMPILE} ${SRCDIR}/vEleyRideal_7D.f90
+	cp -p vEleyRideal_7D.o ${OBJDIR}
+	rm vEleyRideal_7D.o
 
 # --------------------------------------------------------------------------------------------
 # ---------------------------------- START WITH DEPENDENCIES NOW -----------------------------
@@ -525,7 +529,7 @@ ${OBJDIR}/ClassicalEqMotion.o  : ${SRCDIR}/ClassicalEqMotion.f90 ${OBJDIR}/Rando
 
 # Module containing the potential energy surface
 ${OBJDIR}/PotentialModule.o  : ${SRCDIR}/PotentialModule.f90 ${OBJDIR}/vEleyRideal_3D.o ${OBJDIR}/RandomNumberGenerator.o          \
-				${OBJDIR}/FiniteDifference.o ${COMMONDEP}
+				${OBJDIR}/FiniteDifference.o ${OBJDIR}/vEleyRideal_7D.o ${COMMONDEP}
 
 # Module containing the common data (v3)
 ${OBJDIR}/SharedData.o : ${SRCDIR}/SharedData.f90 ${OBJDIR}/IndependentOscillatorsModel.o ${COMMONDEP}
