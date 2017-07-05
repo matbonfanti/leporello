@@ -19,7 +19,7 @@
 !>  \arg N.A.
 !>
 !>  \todo N.A.
-!>                 
+!>
 !***************************************************************************************
 MODULE PotentialAnalysis
 #include "preprocessoptions.cpp"
@@ -39,7 +39,7 @@ MODULE PotentialAnalysis
    !> Dimensions of the potential
    INTEGER, SAVE :: NDim
 
-   !> Input variables for the 3D potential plot 
+   !> Input variables for the 3D potential plot
    REAL :: ZHIncMin, ZHIncMax, ZHTarMin, ZHTarMax, ZCMin, ZCMax           !< boundaries of the grid
    INTEGER :: NpointZHInc, NpointZHTar, NpointZC                          !< nr of points of the grid
    REAL :: GridSpacing                                                    !< grid spacing
@@ -48,7 +48,7 @@ MODULE PotentialAnalysis
    INTEGER :: MaxOptSteps  !< Maximum number of steps for optimizations
    REAL :: OptThreshold    !< Convergence criterium for optimizations
    REAL :: DeltaFiniteDiff !< Magnitude of the displacement used to compute hessian
-   
+
    ! Parameters for Minimum Energy Path computation
    INTEGER :: MaxMEPNrSteps      !< Max number of MEP steps
    INTEGER :: PrintMEPNrSteps    !< Max number of MEP steps printed to file output
@@ -70,7 +70,7 @@ MODULE PotentialAnalysis
       TYPE(InputFile), INTENT(INOUT) :: InputData
       REAL :: LengthConv
 
-      ! parameters for the plot 
+      ! parameters for the plot
       CALL SetFieldFromInput( InputData, "Plot_GridSpacing", GridSpacing )
       GridSpacing = GridSpacing * LengthConversion(InputUnits, InternalUnits)
       CALL SetFieldFromInput( InputData, "Plot_ZHIncMin", ZHIncMin )
@@ -104,7 +104,7 @@ MODULE PotentialAnalysis
       StartMEPThreshold = StartMEPThreshold * ForceConversion(InputUnits, InternalUnits)
 
       ! SCREEN LOG OF THE INPUT VARIABLES
-      
+
       LengthConv = LengthConversion(InternalUnits,InputUnits)
 
       WRITE(*, 900) GridSpacing*LengthConv, LengthUnit(InputUnits)
@@ -114,14 +114,14 @@ MODULE PotentialAnalysis
 
       WRITE(*, 901) MaxOptSteps, OptThreshold*ForceConversion(InternalUnits,InputUnits), &
                     TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits))
-                    
+
       WRITE(*, 902) StartMEPThreshold*ForceConversion(InternalUnits,InputUnits), &
                     TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits)), &
                     MEPStep*LengthConv, LengthUnit(InputUnits), MaxMEPNrSteps, PrintMEPNrSteps
 
       900 FORMAT(" * Plot of a 3D cut of the potential in VTK format ",         /,&
                  " * Grid spacing :                                ",F10.4,1X,A   )
-      903 FORMAT(" * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A)    
+      903 FORMAT(" * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A)
 
       901 FORMAT(" * Stationary states optimization with Newton's method ",     /,&
                  " * Max nr of steps of the optimization:          ",I10,       /,&
@@ -132,7 +132,7 @@ MODULE PotentialAnalysis
                  " * Length of the 4th order RK integration step:  ",F10.4,1X,A,/,&
                  " * Max nr of integration steps:                  ",I10,       /,&
                  " * Max nr of steps printed to output:            ",I10,       /)
-      
+
    END SUBROUTINE PotentialAnalysis_ReadInput
 
 !===============================================================================================================================
@@ -151,8 +151,12 @@ MODULE PotentialAnalysis
       ALLOCATE( X(NDim), A(NDim), MassVector(NDim) )
       IF ( GetSystemDimension( ) == 3 ) THEN
          MassVector = (/ MassHInc, MassHTar, MassC /)
-      ELSE
+      ELSE IF ( GetSystemDimension( ) == 2 ) THEN
          MassVector = (/ MassHInc, MassHTar /)
+      ELSE IF ( GetSystemDimension( ) == 7 ) THEN
+         MassVector(1:3) = MassHInc
+         MassVector(4:6) = MassHTar
+         MassVector(7)   = MassC
       ENDIF
 
    END SUBROUTINE PotentialAnalysis_Initialize
@@ -166,13 +170,13 @@ MODULE PotentialAnalysis
    SUBROUTINE PotentialAnalysis_Run()
       IMPLICIT NONE
 
-      !> Memory to store data for the 3D potential plot 
+      !> Memory to store data for the 3D potential plot
       TYPE(VTKInfo), SAVE :: PotentialPlot                                   !< VTK data type
       REAL, DIMENSION(:), ALLOCATABLE :: PotentialArray                      !< array to store 2D potential
       REAL, DIMENSION(:), ALLOCATABLE :: ZCArray, ZHIncArray, ZHTarArray     !< array with coordinates grid
 
       !> Variables for the MEP analysis
-      REAL, DIMENSION(:), ALLOCATABLE    :: XStart
+      REAL, DIMENSION(:), ALLOCATABLE    :: XStart, Dummy
       LOGICAL, DIMENSION(:), ALLOCATABLE :: LogMask
       REAL, DIMENSION(:), ALLOCATABLE    :: EigenFreq
       REAL, DIMENSION(:,:), ALLOCATABLE  :: EigenModes, Hessian
@@ -183,7 +187,7 @@ MODULE PotentialAnalysis
       !> Data for printing MEP in VTK format
       TYPE(VTKInfo), SAVE :: MEPTraj
 
-      
+
       INTEGER :: i, j, k, nPoint, MaxStep, NPrint
       LOGICAL :: Check
 
@@ -203,25 +207,25 @@ MODULE PotentialAnalysis
       NpointZHTar = INT((ZHTarMax-ZHTarMin)/GridSpacing) + 1
       IF ( GetSystemDimension( ) == 3 ) THEN
          NpointZC = INT((ZCMax-ZCMin)/GridSpacing) + 1
-      ELSE 
+      ELSE
          NpointZC = 1
       END IF
 
       ! Allocate temporary array to store potential data and coord grids
       ALLOCATE( PotentialArray( NpointZHInc * NpointZHTar * NpointZC ),   &
                 ZCArray( NpointZC ), ZHIncArray( NpointZHInc ), ZHTarArray( NpointZHTar ) )
-    
+
       ! Define coordinate grids
       ZHIncArray = (/ ( ZHIncMin + GridSpacing*(i-1), i=1,NpointZHInc) /)
       ZHTarArray = (/ ( ZHTarMin + GridSpacing*(i-1), i=1,NpointZHTar) /)
       IF ( GetSystemDimension( ) == 3 ) THEN
          ZCArray    = (/ ( ZCMin    + GridSpacing*(i-1), i=1,NpointZC)    /)
-      ELSE 
+      ELSE
          ZCArray    = (/ 0.0 /)
       END IF
-      
+
       ! Open VTK file
-      CALL VTK_NewRectilinearSnapshot(PotentialPlot,FileName="V3D_Plot",X=ZHIncArray*LengthConversion(InternalUnits,InputUnits),& 
+      CALL VTK_NewRectilinearSnapshot(PotentialPlot,FileName="V3D_Plot",X=ZHIncArray*LengthConversion(InternalUnits,InputUnits),&
                    Y=ZHTarArray*LengthConversion(InternalUnits,InputUnits), Z=ZCArray*LengthConversion(InternalUnits,InputUnits))
 
       nPoint = 0
@@ -232,11 +236,13 @@ MODULE PotentialAnalysis
             ! Cycle over the ZHTar coordinate values
             DO i = 1, NpointZHInc
                nPoint = nPoint + 1
-               ! Compute potential 
+               ! Compute potential
                IF ( GetSystemDimension( ) == 3 ) THEN
                   PotentialArray(nPoint) = GetPotential( (/ ZHIncArray(i), ZHTarArray(j), ZCArray(k) /) )
-               ELSE 
+               ELSE IF ( GetSystemDimension( ) == 2 ) THEN
                   PotentialArray(nPoint) = GetPotential( (/ ZHIncArray(i), ZHTarArray(j) /) )
+               ELSE IF ( GetSystemDimension( ) == 7 ) THEN
+                  PotentialArray(nPoint) = GetPotential( (/ 0.0, 0.0, ZHIncArray(i), 0.0, 0.0, ZHTarArray(j), ZCArray(k) /) )
                END IF
             END DO
          END DO
@@ -244,9 +250,9 @@ MODULE PotentialAnalysis
       ! Print the potential to vtk file
       CALL VTK_AddScalarField( PotentialPlot,Name="Potential",Field=PotentialArray*EnergyConversion(InternalUnits,InputUnits), &
                                                                                                             LetFileOpen=.FALSE.)
-      IF ( GetSystemDimension( ) == 3 ) THEN
+      IF ( GetSystemDimension( ) == 3 .OR. GetSystemDimension( ) == 7  ) THEN
          WRITE(*,"(/,A)") " * 3D PES as a func of zH_inc, zH_tar and zC written as VTR to file V3D_Plot.vtr"
-      ELSE 
+      ELSE
          WRITE(*,"(/,A)") " * 2D PES as a func of zH_inc, zH_tar written as VTR to file V3D_Plot.vtr"
       END IF
 
@@ -261,35 +267,30 @@ MODULE PotentialAnalysis
 
       ! Allocate arrays for this section
       ALLOCATE( XStart(NDim), Hessian(NDim, NDim), EigenFreq(NDim), EigenModes(NDim,NDim), LogMask(NDim) )
+      ALLOCATE( Dummy(NDim) )
       ALLOCATE( StoreApproach(NDim+2,0:1000), StoreMEP(NDim+2,0:MaxMEPNrSteps) )
-      
-      ! guess reasonable coordinates of the minimum of the PES
-      X(1) = 10.0/MyConsts_Bohr2Ang
-      X(2) = (0.35+1.1)/MyConsts_Bohr2Ang
-      IF ( GetSystemDimension( ) == 3 ) X(3) = 0.35/MyConsts_Bohr2Ang
 
-      ! Find minimum by Newton's optimization
-      LogMask(:) = .TRUE.
-      LogMask(1) = .FALSE.
-      
+      ! guess reasonable coordinates of the minimum of the PES
+      CALL StartSystemForScattering( X, Dummy, MassVector, 10.0/MyConsts_Bohr2Ang, 0.0, 0.0, Task=2 )
+      LogMask(:) =  GetInitialAsymptoteMask( )
       XStart = NewtonLocator( GetPotAndForces, X, MaxOptSteps, OptThreshold, 1.0, DeltaFiniteDiff, LogMask )
       ! Computing the energy at this geometry
       EStart = GetPotAndForces( XStart, A )
 
-      ! Compute normal modes 
+      ! Compute normal modes
       ! Numerical hessian of the system potential
       Hessian = GetMassScaledHessian( XStart )
       ! Diagonalize the hessian
       CALL TheOneWithDiagonalization( Hessian, EigenModes, EigenFreq )
 
-      WRITE(*,"(/,A)") " Starting geometry and energy of the MEP " 
-      DO i = 1, NDim 
+      WRITE(*,"(/,A)") " Starting geometry and energy of the MEP "
+      DO i = 1, NDim
          WRITE(*,501) GetXLabel(i), XStart(i)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits)
       END DO
       WRITE(*,502) EStart*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits)
 
-      WRITE(*,"(/,A)") " Potential normal modes at the starting geometry" 
-      DO i = 1, NDim 
+      WRITE(*,"(/,A)") " Potential normal modes at the starting geometry"
+      DO i = 1, NDim
          IF ( EigenFreq(i) > 0.0 ) THEN
             WRITE(*,503) i, SQRT(EigenFreq(i))*FreqConversion(InternalUnits,InputUnits), FreqUnit(InputUnits), &
                       TRIM(LengthUnit(InternalUnits)), EigenModes(:,i)
@@ -302,11 +303,11 @@ MODULE PotentialAnalysis
       ! =========================================================
       !                 (3) minimum energy path
       ! =========================================================
-      
+
       PRINT "(/,A,/)",    " **** Minimum energy path ****"
       WRITE(*,701)
 
-      ! Write header lines screen 
+      ! Write header lines screen
       WRITE(*,700) TRIM(LengthUnit(InputUnits)),TRIM(LengthUnit(InputUnits)),&
                    TRIM(LengthUnit(InputUnits)),TRIM(EnergyUnit(InputUnits))
 
@@ -320,7 +321,11 @@ MODULE PotentialAnalysis
       ! First follow the incident direction until significant gradient is found
       DO i = 1, 1000
          ! Move along the entrance channel
-         X(1) = X(1) - 0.05
+         IF ( GetSystemDimension( ) == 2 .OR. GetSystemDimension( ) == 3 ) THEN
+            X(1) = X(1) - 0.05
+         ELSE IF ( GetSystemDimension( ) == 7 ) THEN
+            X(3) = X(3) - 0.05
+         END IF
          ! Compute norm of the gradient
          E = GetPotAndForces( X, A ); GradNorm = SQRT(TheOneWithVectorDotVector(A, A))
          ! Check when the gradient is large
@@ -337,7 +342,7 @@ MODULE PotentialAnalysis
                              TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits))
       ! Write approach along the entrance channel
       DO i = 1, NPrint
-         WRITE(MEPFullUnit,601) (StoreApproach(1,i)-StoreApproach(1,NPrint))*LengthConversion(InternalUnits, InputUnits), &         
+         WRITE(MEPFullUnit,601) (StoreApproach(1,i)-StoreApproach(1,NPrint))*LengthConversion(InternalUnits, InputUnits), &
                                 StoreApproach(2,i)*EnergyConversion(InternalUnits, InputUnits), &
                                 StoreApproach(3:2+NDim,i)*LengthConversion(InternalUnits, InputUnits)
       END DO
@@ -371,23 +376,28 @@ MODULE PotentialAnalysis
       WRITE(*,601) MaxStep*MEPStep*LengthConversion(InternalUnits, InputUnits), E*EnergyConversion(InternalUnits, InputUnits), &
                          X(:)*LengthConversion(InternalUnits, InputUnits)
       WRITE(*,701)
-      ! Store final step in the data array 
+      ! Store final step in the data array
       NPrint = NPrint + 1
       StoreMEP(:,NPrint) = (/ MaxStep*MEPStep, E, X(1:NDim) /)
 
       ! Write the MEP
       DO i = 1, NPrint
-         WRITE(MEPFullUnit,601) StoreMEP(1,i)*LengthConversion(InternalUnits, InputUnits), &         
+         WRITE(MEPFullUnit,601) StoreMEP(1,i)*LengthConversion(InternalUnits, InputUnits), &
                                 StoreMEP(2,i)*EnergyConversion(InternalUnits, InputUnits), &
                                 StoreMEP(3:2+NDim,i)*LengthConversion(InternalUnits, InputUnits)
       END DO
       ! Close file
       CLOSE(MEPFullUnit)
-      
-      ! Write the MEP to VTV files
-      CALL VTK_WriteTrajectory( MEPTraj,StoreMEP(3:2+NDim,1:NPrint)*LengthConversion(InternalUnits, InputUnits),"MEP_Trajectory")
 
-      
+      ! Write the MEP to VTV files
+      IF ( GetSystemDimension( ) == 2  ) THEN
+         CALL VTK_WriteTrajectory(MEPTraj,StoreMEP((/3,4/),1:NPrint)*LengthConversion(InternalUnits,InputUnits),"MEP_Trajectory")
+      ELSE IF ( GetSystemDimension( ) == 3 ) THEN
+         CALL VTK_WriteTrajectory(MEPTraj,StoreMEP((/3,4,5/),1:NPrint)*LengthConversion(InternalUnits,InputUnits),"MEP_Trajectory")
+      ELSE IF  ( GetSystemDimension( ) == 7 ) THEN
+         CALL VTK_WriteTrajectory(MEPTraj,StoreMEP((/5,8,9/),1:NPrint)*LengthConversion(InternalUnits, InputUnits),"MEP_Trajectory")
+      END IF
+
       WRITE(*,"(/,A)") " * Last step reached... MEP written to file ________"
 
       ! =========================================================
@@ -397,30 +407,27 @@ MODULE PotentialAnalysis
       PRINT "(/,A)",    " **** Final asymptotic geometry ****"
 
       ! guess reasonable coordinates of the minimum of the PES in the asymptotic out channel
-      X(1) = 20.0/MyConsts_Bohr2Ang
-      X(2) = X(1)-0.35/MyConsts_Bohr2Ang
-      IF ( GetSystemDimension( ) == 3 ) X(3) = 0.0/MyConsts_Bohr2Ang
-
-      ! Find minimum by Newton's optimization
+      CALL StartSystemForScattering( X, Dummy, MassVector, 20.0/MyConsts_Bohr2Ang, 0.0, 0.0, Task=3 )
       LogMask(:) = .TRUE.
+      ! Find minimum by Newton's optimization
       X = NewtonLocator( GetPotAndForces, X, MaxOptSteps, OptThreshold, 1.0, DeltaFiniteDiff, LogMask )
       ! Computing the energy at this geometry
       E = GetPotAndForces( X, A )
 
-      ! Compute normal modes 
+      ! Compute normal modes
       ! Numerical hessian of the system potential
       Hessian = GetMassScaledHessian( X )
       ! Diagonalize the hessian
       CALL TheOneWithDiagonalization( Hessian, EigenModes, EigenFreq )
 
-      WRITE(*,"(/,A)") " Final asymptotic geometry and energy of the MEP " 
-      DO i = 1, NDim 
+      WRITE(*,"(/,A)") " Final asymptotic geometry and energy of the MEP "
+      DO i = 1, NDim
          WRITE(*,501) GetXLabel(i), X(i)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits)
       END DO
       WRITE(*,502) E*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits)
 
-      WRITE(*,"(/,A)") " Potential normal modes at the final asymptotic geometry" 
-      DO i = 1, NDim 
+      WRITE(*,"(/,A)") " Potential normal modes at the final asymptotic geometry"
+      DO i = 1, NDim
          IF ( EigenFreq(i) > 0.0 ) THEN
             WRITE(*,503) i, SQRT(EigenFreq(i))*FreqConversion(InternalUnits,InputUnits), FreqUnit(InputUnits), &
                       TRIM(LengthUnit(InternalUnits)), EigenModes(:,i)
@@ -428,8 +435,8 @@ MODULE PotentialAnalysis
             WRITE(*,504) i, SQRT(-EigenFreq(i))*FreqConversion(InternalUnits,InputUnits), FreqUnit(InputUnits), &
                       TRIM(LengthUnit(InternalUnits)), EigenModes(:,i)
          END IF
-      END DO      
-      
+      END DO
+
       501 FORMAT( " * ",A5,23X,1F15.6,1X,A )
       502 FORMAT( " * Energy",22X,1F15.6,1X,A )
       503 FORMAT( " Normal Mode ",I5," - real frequency: ",1F15.2,1X,A, /, &
@@ -444,7 +451,7 @@ MODULE PotentialAnalysis
       701 FORMAT ( "#---------------------------------------------------------------------------------------------" )
 
       ! Deallocate memory
-      DEALLOCATE( XStart, Hessian, EigenFreq, EigenModes, LogMask )
+      DEALLOCATE( XStart, Hessian, EigenFreq, EigenModes, LogMask, Dummy )
       DEALLOCATE( StoreMEP )
 
    END SUBROUTINE PotentialAnalysis_Run
@@ -466,7 +473,7 @@ MODULE PotentialAnalysis
 
 !**************************************************************************************
 !> Compute the Hessian of the potential in mass square root scaled coordinates
-!> as it is needed for the normal modes analysis  
+!> as it is needed for the normal modes analysis
 !>
 !> @param AtPoint   Input vector with the coordinates where to compute H
 !> @returns         Hessian matrix of the potential in AtPoint
@@ -480,7 +487,7 @@ MODULE PotentialAnalysis
          CALL ERROR( size(AtPoint) /= NDim, "PotentialModule.GetMassScaledHessian: input array dimension mismatch" )
 
          ! Use subroutine GetHessianFromForces to compute the matrix of the 2nd derivatives
-         Hessian(:,:) = GetHessianFromForces( AtPoint, GetPotAndForces, DeltaFiniteDiff ) 
+         Hessian(:,:) = GetHessianFromForces( AtPoint, GetPotAndForces, DeltaFiniteDiff )
          ! Numerical hessian of the potential in mass weighted coordinates
          DO j = 1, NDim
             DO i = 1, NDim
@@ -493,7 +500,7 @@ MODULE PotentialAnalysis
 !===============================================================================================================================
 
 !**************************************************************************************
-!> Follow gradient integrating the MEP differential equation, 
+!> Follow gradient integrating the MEP differential equation,
 !> solved with a runge-kutta 4th order step.
 !>
 !> @param X            Current position
@@ -515,7 +522,7 @@ MODULE PotentialAnalysis
 
       IF ( PRESENT(Mask) ) THEN
          LogMask = Mask
-      ELSE 
+      ELSE
          LogMask = .TRUE.
       END IF
 
@@ -571,7 +578,7 @@ MODULE PotentialAnalysis
 
          CALL ERROR( NMask /= COUNT(Mask), &
             " PotentialModule.ConstrainedVector: wrong input dimension" )
-         
+
          n = 0
          DO i = 1, size(Vector)
             IF ( Mask(i) ) THEN

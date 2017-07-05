@@ -36,7 +36,7 @@ MODULE PotentialModule
 
    PRIVATE
    PUBLIC :: SetupPotential                                        !< setup subroutine
-   PUBLIC :: GetXLabel, GetSystemDimension, PESIsCollinear         !< info subroutines
+   PUBLIC :: GetXLabel, GetSystemDimension, GetScatterDimension, PESIsCollinear !< info subroutines
    PUBLIC :: GetPotential, GetPotAndForces                         !< get potential and forces
    PUBLIC :: GetVPartitions                                        !< get pot energy partitioned according to some relevant scheme
    PUBLIC :: StartSystemForScattering, GetInitialAsymptoteMask, GetInitialBoundIndices     !< system initial conditions subroutines
@@ -53,6 +53,8 @@ MODULE PotentialModule
 
    !> Number of dimensions of the potential
    INTEGER, SAVE :: NDim
+   !> Number of scattering coordinates
+   INTEGER, SAVE :: NScatter
 
    !> Labels of the potential coordinates
    CHARACTER(5), DIMENSION(:), ALLOCATABLE, SAVE :: CoordLabels
@@ -135,6 +137,7 @@ MODULE PotentialModule
                ELSE
                   CALL AbortWithError( "PotentialModule.SetupPotential: wrong ReducedDim value " )
                END IF
+               NScatter = 1
 
                ! Set the labels of the coordinates
                ALLOCATE( CoordLabels(NDim) )
@@ -148,6 +151,7 @@ MODULE PotentialModule
 
                ! Set the number of dimensions
                NDim = 7
+               NScatter = 3
 
                ! Set the labels of the coordinates
                ALLOCATE( CoordLabels(NDim) )
@@ -158,6 +162,9 @@ MODULE PotentialModule
                CoordLabels(5) = "Ht_y"
                CoordLabels(6) = "Ht_z"
                CoordLabels(7) = "C_z"
+
+               ! Print warning: energy partition analysis not yet implemented
+               CALL ShowWarning("Energy partition between scattering and substrate is not implemented! Zero are returned instead")
 
          ! ====================================================================================================
             CASE DEFAULT
@@ -264,6 +271,21 @@ MODULE PotentialModule
 !===============================================================================================================================
 
 !**************************************************************************************
+!> Function that returns the number of scattering dimension of the system.
+!> @returns   Nr of degrees of freedom which are unbound in the initial conditions
+!**************************************************************************************
+      INTEGER FUNCTION GetScatterDimension( )
+         IMPLICIT NONE
+
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetScatterDimension : Module not Setup" )
+         GetScatterDimension = NScatter
+
+      END FUNCTION GetScatterDimension
+
+!===============================================================================================================================
+
+!**************************************************************************************
 !> Inquire whether the potential is collinear or not
 !> @returns   Logical value: .TRUE. for a collinear PES, .FALSE. otherwise
 !**************************************************************************************
@@ -272,7 +294,12 @@ MODULE PotentialModule
 
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.PESIsCollinear : Module not Setup" )
-         PESIsCollinear = .TRUE.
+         SELECT CASE( PotentialType )
+            CASE(ELEYRIDEAL_3D)
+               PESIsCollinear = .TRUE.
+            CASE(ELEYRIDEAL_7D)
+               PESIsCollinear = .FALSE.
+         END SELECT
 
       END FUNCTION PESIsCollinear
 
@@ -287,7 +314,10 @@ MODULE PotentialModule
 
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetNrChannels : Module not Setup" )
-         GetNrChannels = 4
+         SELECT CASE( PotentialType )
+            CASE(ELEYRIDEAL_3D,ELEYRIDEAL_7D)
+               GetNrChannels = 4
+         END SELECT
 
       END FUNCTION GetNrChannels
 
@@ -305,17 +335,22 @@ MODULE PotentialModule
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetChannelLabel : Module not Setup" )
 
-         SELECT CASE ( ChannelIdNumber )
-            CASE ( 0 )
-               GetChannelLabel = "interaction"
-            CASE ( 1 )
-               GetChannelLabel = "reflection"
-            CASE ( 2 )
-               GetChannelLabel = "reaction"
-            CASE ( 3 )
-               GetChannelLabel = "cid"
-            CASE DEFAULT
-               CALL AbortWithError( "PotentialModule.GetChannelLabel : channel ID does not exist" )
+         SELECT CASE( PotentialType )
+            CASE(ELEYRIDEAL_3D,ELEYRIDEAL_7D)
+
+               SELECT CASE ( ChannelIdNumber )
+                  CASE ( 0 )
+                     GetChannelLabel = "interaction"
+                  CASE ( 1 )
+                     GetChannelLabel = "reflection"
+                  CASE ( 2 )
+                     GetChannelLabel = "reaction"
+                  CASE ( 3 )
+                     GetChannelLabel = "cid"
+                  CASE DEFAULT
+                     CALL AbortWithError( "PotentialModule.GetChannelLabel : channel ID does not exist" )
+               END SELECT
+
          END SELECT
 
       END FUNCTION GetChannelLabel
@@ -330,20 +365,41 @@ MODULE PotentialModule
       INTEGER FUNCTION GetCurrentChannel( Position )
          IMPLICIT NONE
          REAL, DIMENSION(:), INTENT(IN) :: Position
+         REAL :: R
 
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetCurrentChannel : Module not Setup" )
          CALL ERROR( size(Position) > NDim .OR. size(Position) < 1, "PotentialModule.GetCurrentChannel : wrong coordinate number" )
 
-         IF ( Position(1) > 20. .AND. Position(2) < 5. ) THEN
-            GetCurrentChannel = 1         ! projectile is reflected to the gas phase, target still bound
-         ELSE IF ( Position(1) > 20. .AND. Position(2) > 20. .AND. abs(Position(1)-Position(2)) < 4.0 ) THEN
-            GetCurrentChannel = 2         ! projectile and target are reflected to the gas phase in a bound state
-         ELSE IF ( Position(1) > 20. .AND. Position(2) > 20. .AND. abs(Position(1)-Position(2)) > 4.0 ) THEN
-            GetCurrentChannel = 3         ! projectile and target are reflected to the gas phase, without being in a bound state
-         ELSE
-            GetCurrentChannel = 0
-         END IF
+         SELECT CASE( PotentialType )
+
+            CASE(ELEYRIDEAL_3D)
+
+               R = abs(Position(1)-Position(2))
+               IF ( Position(1) > 20. .AND. Position(2) < 5. ) THEN
+                  GetCurrentChannel = 1     ! projectile is reflected to the gas phase, target still bound
+               ELSE IF ( Position(1) > 20. .AND. Position(2) > 20. .AND. R < 4.0 ) THEN
+                  GetCurrentChannel = 2     ! projectile and target are reflected to the gas phase in a bound state
+               ELSE IF ( Position(1) > 20. .AND. Position(2) > 20. .AND. R > 4.0 ) THEN
+                  GetCurrentChannel = 3     ! projectile and target are reflected to the gas phase, without being in a bound state
+               ELSE
+                  GetCurrentChannel = 0
+               END IF
+
+            CASE(ELEYRIDEAL_7D)
+
+               R = SQRT((Position(1)-Position(3))**2+(Position(2)-Position(4))**2+(Position(3)-Position(6))**2)
+               IF ( Position(3) > 20. .AND. Position(6) < 5. ) THEN
+                  GetCurrentChannel = 1     ! projectile is reflected to the gas phase, target still bound
+               ELSE IF ( Position(3) > 20. .AND. Position(6) > 20. .AND. R < 4.0 ) THEN
+                  GetCurrentChannel = 2     ! projectile and target are reflected to the gas phase in a bound state
+               ELSE IF ( Position(3) > 20. .AND. Position(6) > 20. .AND. R > 4.0 ) THEN
+                  GetCurrentChannel = 3     ! projectile and target are reflected to the gas phase, without being in a bound state
+               ELSE
+                  GetCurrentChannel = 0
+               END IF
+
+         END SELECT
 
       END FUNCTION GetCurrentChannel
 
@@ -383,23 +439,52 @@ MODULE PotentialModule
             ! In case of a ASYMPTOTIC_START task, the scatterer is placed far from the target, with no incoming velocity
             ! the substrate is placed in equilibrium geometry
             CASE ( ASYMPTOTIC_START )
-                X(1) = InitDist
-                X(2) = Minimum_ZHTar
-                IF (NDim == 3) X(3) = Minimum_ZCarb
+
+               SELECT CASE( PotentialType )
+                  CASE(ELEYRIDEAL_3D)
+                     X(1) = InitDist
+                     X(2) = Minimum_ZHTar
+                     IF (NDim == 3) X(3) = Minimum_ZCarb
+                  CASE(ELEYRIDEAL_7D)
+                     X(1:2) = 0.0
+                     X(3) = InitDist
+                     X(4:5) = 0.0
+                     X(6) = Minimum_ZHTar
+                     X(7) = Minimum_ZCarb
+               END SELECT
 
             ! In case of a SCATTERING task, the scatterer is placed at the input initial conditions
             ! the substrate is left untouched
             CASE ( SCATTERING )
-               X(1) = InitDist
-               V(1) = -SQRT( 2.0 * InitEKin / M(1) )
+
+               SELECT CASE( PotentialType )
+                  CASE(ELEYRIDEAL_3D)
+                     X(1) = InitDist
+                     V(1) = -SQRT( 2.0 * InitEKin / M(1) )
+                  CASE(ELEYRIDEAL_7D)
+                     X(1) = ImpactPar
+                     X(2) = 0.0
+                     V(1:2) = 0.0
+                     X(3) = InitDist
+                     V(3) = -SQRT( 2.0 * InitEKin / M(3) )
+               END SELECT
 
             ! In case of a ASYMPTOTIC_END task, the scatterer and the target are placed far from the carbon,
             ! at the H2 equil distance, the substrate is placed in Z = 0 position
             CASE ( ASYMPTOTIC_END )
-                X(1) = InitDist
-                X(2) = InitDist-H2EqD
-                IF (NDim == 3) X(3) = 0.0
 
+               SELECT CASE( PotentialType )
+                  CASE(ELEYRIDEAL_3D)
+                     X(1) = InitDist
+                     X(2) = InitDist-H2EqD
+                     IF (NDim == 3) X(3) = 0.0
+                  CASE(ELEYRIDEAL_7D)
+                     X(1:2) = 0.0
+                     X(3) = InitDist
+                     X(4:5) = 0.0
+                     X(6) = InitDist-H2EqD
+                     X(7) = 0.0
+               END SELECT
 
             CASE DEFAULT
                CALL AbortWithError( "PotentialModule.StartSystemForScattering : Task is not defined" )
@@ -422,9 +507,15 @@ MODULE PotentialModule
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetInitialAsymptoteMask : Module not Setup" )
 
-         Mask(1) = .FALSE.
-         Mask(2) = .TRUE.
-         IF ( VReducedDim ==  FULLPOT )  Mask(3) = .TRUE.
+         SELECT CASE( PotentialType )
+            CASE(ELEYRIDEAL_3D)
+               Mask(1) = .FALSE.
+               Mask(2) = .TRUE.
+               IF ( VReducedDim ==  FULLPOT )  Mask(3) = .TRUE.
+            CASE(ELEYRIDEAL_7D)
+               Mask(1:3) = .FALSE.
+               Mask(4:7) = .TRUE.
+         END SELECT
 
       END FUNCTION GetInitialAsymptoteMask
 
@@ -438,7 +529,7 @@ MODULE PotentialModule
 !**************************************************************************************
       FUNCTION GetInitialBoundIndices( ) RESULT(Indices)
          IMPLICIT NONE
-         INTEGER, DIMENSION(NDim-1) :: Indices
+         INTEGER, DIMENSION(NDim-NScatter) :: Indices
          INTEGER :: n, i
 
          ! Error if module not have been setup yet
@@ -446,7 +537,12 @@ MODULE PotentialModule
 
          n = 0
          DO i = 1, NDim
-            IF (i == 1) CYCLE
+            SELECT CASE( PotentialType )
+               CASE(ELEYRIDEAL_3D)
+                  IF (i == 1) CYCLE
+               CASE(ELEYRIDEAL_7D)
+                  IF (i >= 1 .OR. i <= 3) CYCLE
+            END SELECT
             n = n+1
             Indices(n) = i
          END DO
@@ -467,14 +563,9 @@ MODULE PotentialModule
       REAL FUNCTION GetPotential( Positions ) RESULT(V)
          IMPLICIT NONE
          REAL, DIMENSION(:), INTENT(IN)  :: Positions
-         REAL, DIMENSION(3) :: Dummy
-         REAL               :: FirstDer, SecDer, DeltaF
-         INTEGER            :: NIter, k
-
-         REAL, DIMENSION(4), PARAMETER :: Deltas = (/ -2.0,    -1.0,    +1.0,    +2.0    /)
-         REAL, DIMENSION(4), PARAMETER :: Coeffs = (/ +1./12., -8./12., +8./12., -1./12. /)
-         INTEGER :: NMaxIter = 10000
-         REAL    :: GradThresh = 0.00001
+         REAL, DIMENSION(NDim) :: Dummy
+         REAL                  :: FirstDer, SecDer, DeltaF
+         INTEGER               :: NIter, k
 
          INTERFACE
             SUBROUTINE ER_3D (zi, zt, zc, vv, dv_zi, dv_zt, dv_zc)
@@ -483,43 +574,43 @@ MODULE PotentialModule
             END SUBROUTINE
           END INTERFACE
 
+         INTERFACE
+            SUBROUTINE ER_7D (dof, vv, dv)
+               REAL*8, DIMENSION(7), INTENT(IN) :: dof
+               REAL*8, INTENT(OUT) :: vv
+               REAL*8, DIMENSION(7), INTENT(OUT) :: dv
+            END SUBROUTINE
+         END INTERFACE
+
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetPotential : Module not Setup" )
          ! Check the number of degree of freedom
          CALL ERROR( size(Positions) /= NDim, "PotentialModule.GetPotential: Positions array dimension mismatch" )
 
          ! Compute energy
-         IF ( VReducedDim ==  FULLPOT ) THEN
-           CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Dummy(1), Dummy(2), Dummy(3) )
+         SELECT CASE( PotentialType )
 
-         ELSE IF ( VReducedDim == SUDDEN ) THEN
-            CALL ER_3D( Positions(1), Positions(2), Minimum_ZCarb, V, Dummy(1), Dummy(2), Dummy(3) )
+            ! ====================================================================================================
+            CASE(ELEYRIDEAL_3D)
+            ! ====================================================================================================
 
-         ELSE IF ( VReducedDim == ADIABATIC ) THEN
-            CALL AbortWithError(" Adiabatic not yet implemented" )
+               IF ( VReducedDim ==  FULLPOT ) THEN
+               CALL ER_3D( Positions(1), Positions(2), Positions(3), V, Dummy(1), Dummy(2), Dummy(3) )
 
-            ! Optimize carbon position with newton method (numerical sec derivs)
-            Iterations: DO NIter = 1, NMaxIter
-               CALL ER_3D( Positions(1), Positions(2), OptZc, V, Dummy(1), Dummy(2), FirstDer )
-               IF ( ABS(FirstDer) > 0.01 ) THEN
-                 OptZc = OptZc - FirstDer
-               ELSE
-                 SecDer = 0.0
-                 DO k = 1, size(Deltas)
-                    CALL ER_3D( Positions(1), Positions(2), OptZc+Deltas(k)*SmallDelta, V, Dummy(1), Dummy(2), DeltaF )
-                    SecDer = SecDer + Coeffs(k)*DeltaF
-                 END DO
-                 SecDer = SecDer / SmallDelta
-                 IF (ABS(SecDer) < 0.001) THEN
-                    OptZc = OptZc - FirstDer
-                 ELSE
-                    OptZc = OptZc - FirstDer/SecDer
-                 ENDIF
+               ELSE IF ( VReducedDim == SUDDEN ) THEN
+                  CALL ER_3D( Positions(1), Positions(2), Minimum_ZCarb, V, Dummy(1), Dummy(2), Dummy(3) )
+
+               ELSE IF ( VReducedDim == ADIABATIC ) THEN
+                  CALL AbortWithError(" Adiabatic not yet implemented" )
                END IF
-               IF ( ABS(FirstDer) < GradThresh ) EXIT Iterations
-            END DO Iterations
-            CALL ER_3D( Positions(1), Positions(2), OptZc, V, Dummy(1), Dummy(2), FirstDer )
-         END IF
+
+            ! ====================================================================================================
+            CASE(ELEYRIDEAL_7D)
+            ! ====================================================================================================
+
+               CALL ER_7D( Positions, V, Dummy )
+
+         END SELECT
 
       END FUNCTION GetPotential
 
@@ -546,28 +637,51 @@ MODULE PotentialModule
             END SUBROUTINE
          END INTERFACE
 
+         INTERFACE
+            SUBROUTINE ER_7D (dof, vv, dv)
+               REAL*8, DIMENSION(7), INTENT(IN) :: dof
+               REAL*8, INTENT(OUT) :: vv
+               REAL*8, DIMENSION(7), INTENT(OUT) :: dv
+            END SUBROUTINE
+         END INTERFACE
+
          ! Error if module not have been setup yet
          CALL ERROR(.NOT. PotentialModuleIsSetup,"PotentialModule.GetVPartitions: module not set")
          ! Check the number of degree of freedom
          CALL ERROR( size(Positions) /= NDim, "PotentialModule.GetVPartitions: input array dimension mismatch" )
 
-         IF ( VReducedDim ==  FULLPOT ) THEN
-            zC = Positions(3)
-         ELSE IF ( VReducedDim == SUDDEN ) THEN
-            zC = Minimum_ZCarb
-         ELSE IF ( VReducedDim == ADIABATIC ) THEN
-            CALL AbortWithError(" Adiabatic not yet implemented" )
-         END IF
+         ! Compute energy
+         SELECT CASE( PotentialType )
 
-         ! 3 expectation values are computed:
-         ! 1) Compute energy of the carbon for H1 and H2 far from surface at eq position
-         CALL ER_3D (100., 100.+H2EqD, zC,  E1, Dummy(1), Dummy(2), Dummy(3))
-         CALL ER_3D (100., 100.+H2EqD, 0.0, E2, Dummy(1), Dummy(2), Dummy(3))
-         VPart(1) = E1-E2
-         ! 2) Compute energy of H-H far from the surface, for the carbon planar
-         CALL ER_3D (Positions(1)+100., Positions(2)+100., 0.0, VPart(2), Dummy(1), Dummy(2), Dummy(3))
-         ! 3) Compute energy of the C-H for the other H far from the surface
-         CALL ER_3D (100., Positions(2), zC, VPart(3), Dummy(1), Dummy(2), Dummy(3))
+            ! ====================================================================================================
+            CASE(ELEYRIDEAL_3D)
+            ! ====================================================================================================
+
+               IF ( VReducedDim ==  FULLPOT ) THEN
+                  zC = Positions(3)
+               ELSE IF ( VReducedDim == SUDDEN ) THEN
+                  zC = Minimum_ZCarb
+               ELSE IF ( VReducedDim == ADIABATIC ) THEN
+                  CALL AbortWithError(" Adiabatic not yet implemented" )
+               END IF
+
+               ! 3 expectation values are computed:
+               ! 1) Compute energy of the carbon for H1 and H2 far from surface at eq position
+               CALL ER_3D (100., 100.+H2EqD, zC,  E1, Dummy(1), Dummy(2), Dummy(3))
+               CALL ER_3D (100., 100.+H2EqD, 0.0, E2, Dummy(1), Dummy(2), Dummy(3))
+               VPart(1) = E1-E2
+               ! 2) Compute energy of H-H far from the surface, for the carbon planar
+               CALL ER_3D (Positions(1)+100., Positions(2)+100., 0.0, VPart(2), Dummy(1), Dummy(2), Dummy(3))
+               ! 3) Compute energy of the C-H for the other H far from the surface
+               CALL ER_3D (100., Positions(2), zC, VPart(3), Dummy(1), Dummy(2), Dummy(3))
+
+            ! ====================================================================================================
+            CASE(ELEYRIDEAL_7D)
+            ! ====================================================================================================
+
+               VPart = 0.0
+
+         END SELECT
 
       END FUNCTION GetVPartitions
 
