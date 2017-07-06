@@ -42,9 +42,10 @@ InputTemp   : 16
 InputFreq   : 18
 
 # Potential plot
-# scanned coordinate indices
+# scanned coordinate indices 
+# when Plot_IndexQ3 is equal to 0 or not specified, a 2D cut is computed
 Plot_IndexQ1 : 3 
-Plot_IndexQ2 : 6
+Plot_IndexQ2 : 6  
 Plot_IndexQ3 : 0
 # grid spacing (in all directions)
 Plot_GridSpacing : 0.05 
