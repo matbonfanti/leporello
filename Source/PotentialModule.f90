@@ -535,17 +535,19 @@ MODULE PotentialModule
          ! Error if module not have been setup yet
          CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetInitialBoundIndices : Module not Setup" )
 
+         Indices = 0
          n = 0
          DO i = 1, NDim
             SELECT CASE( PotentialType )
                CASE(ELEYRIDEAL_3D)
                   IF (i == 1) CYCLE
                CASE(ELEYRIDEAL_7D)
-                  IF (i >= 1 .OR. i <= 3) CYCLE
+                  IF (i >= 1 .AND. i <= 3) CYCLE
             END SELECT
             n = n+1
             Indices(n) = i
          END DO
+         PRINT*, Indices
 
       END FUNCTION GetInitialBoundIndices
 
