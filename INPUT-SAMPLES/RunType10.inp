@@ -23,7 +23,7 @@ BathType : 1
 # "vEleyRideal_3D" - 3D eley-rideal potential including carbon atom
 # "vEleyRideal_7D" - 7D extension of the 3D eley-rideal potential including lateral displacemnts
 SystemPotType : vEleyRideal_7D
-DerivTesting : TRUE
+DerivTesting : FALSE
 
 # Units
 # Length: 0 = bohr, 1 = Ang
@@ -42,21 +42,27 @@ InputTemp   : 16
 InputFreq   : 18
 
 # Potential plot
+# scanned coordinate indices
+Plot_IndexQ1 : 3 
+Plot_IndexQ2 : 6
+Plot_IndexQ3 : 0
 # grid spacing (in all directions)
 Plot_GridSpacing : 0.05 
 # min and max along the incident H z coordinate
-Plot_ZHIncMin : 2.5
-Plot_ZHIncMax : 10.0
+Plot_Q1Min : 2.5
+Plot_Q1Max : 10.0
 # min and max along the target H z coordinate
-Plot_ZHTarMin : 1.3
-Plot_ZHTarMax : 5.0
+Plot_Q2Min : 1.3
+Plot_Q2Max : 5.0
 # min and max along the C z coordinate
-Plot_ZCMin    : -0.05
-Plot_ZCMax    : 0.4
+Plot_Q3Min    : -0.05
+Plot_Q3Max    : 0.4
+# reference state for the other coordinates
+Plot_QReferenceFile : EquilGeom.dat 
 
 # Stationary states optimization: max nr of steps, threshold of the iterative Newton search
-MaxOptSteps : 1000000
-OptThreshold : 1.E-12
+MaxOptSteps : 100
+OptThreshold : 1.E-6
 # Minimum energy path: gradient threshold above which start to follow the gradient
 StartMEPThreshold : 0.15
 # Minimum energy path: length of the step along the gradient, max nr of steps

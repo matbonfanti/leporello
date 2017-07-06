@@ -40,9 +40,11 @@ MODULE PotentialAnalysis
    INTEGER, SAVE :: NDim
 
    !> Input variables for the 3D potential plot
-   REAL :: ZHIncMin, ZHIncMax, ZHTarMin, ZHTarMax, ZCMin, ZCMax           !< boundaries of the grid
-   INTEGER :: NpointZHInc, NpointZHTar, NpointZC                          !< nr of points of the grid
-   REAL :: GridSpacing                                                    !< grid spacing
+   INTEGER :: IndexQ1, IndexQ2, IndexQ3                      !< indices of the three coords as x,y,z in the 3D plot
+   REAL    :: Q1Min, Q1Max, Q2Min, Q2Max, Q3Min, Q3Max       !< boundaries of the grid
+   INTEGER :: NpointQ1, NpointQ2, NpointQ3                   !< nr of points of the grid
+   REAL    :: GridSpacing                                    !< grid spacing
+   CHARACTER(100) :: QReferenceFile                          !< file with the reference coords for the dof's which are not scanned
 
    ! Parameters for optimizations
    INTEGER :: MaxOptSteps  !< Maximum number of steps for optimizations
@@ -73,20 +75,24 @@ MODULE PotentialAnalysis
       ! parameters for the plot
       CALL SetFieldFromInput( InputData, "Plot_GridSpacing", GridSpacing )
       GridSpacing = GridSpacing * LengthConversion(InputUnits, InternalUnits)
-      CALL SetFieldFromInput( InputData, "Plot_ZHIncMin", ZHIncMin )
-      ZHIncMin = ZHIncMin * LengthConversion(InputUnits, InternalUnits)
-      CALL SetFieldFromInput( InputData, "Plot_ZHIncMax", ZHIncMax )
-      ZHIncMax = ZHIncMax * LengthConversion(InputUnits, InternalUnits)
-      CALL SetFieldFromInput( InputData, "Plot_ZHTarMin", ZHTarMin )
-      ZHTarMin = ZHTarMin * LengthConversion(InputUnits, InternalUnits)
-      CALL SetFieldFromInput( InputData, "Plot_ZHTarMax", ZHTarMax )
-      ZHTarMax = ZHTarMax * LengthConversion(InputUnits, InternalUnits)
-      IF ( GetSystemDimension( ) == 3 ) THEN
-         CALL SetFieldFromInput( InputData, "Plot_ZCMin", ZCMin )
-         ZCMin = ZCMin * LengthConversion(InputUnits, InternalUnits)
-         CALL SetFieldFromInput( InputData, "Plot_ZCMax", ZCMax )
-         ZCMax = ZCMax * LengthConversion(InputUnits, InternalUnits)
+      CALL SetFieldFromInput( InputData, "Plot_IndexQ1",     IndexQ1 )
+      CALL SetFieldFromInput( InputData, "Plot_IndexQ2",     IndexQ2 )
+      CALL SetFieldFromInput( InputData, "Plot_IndexQ3",     IndexQ3,  0 ) ! NOTE: for IndexQ3 == 0, a 2D plot is required!
+      CALL SetFieldFromInput( InputData, "Plot_Q1Min", Q1Min )
+      Q1Min = Q1Min * LengthConversion(InputUnits, InternalUnits)
+      CALL SetFieldFromInput( InputData, "Plot_Q1Max", Q1Max )
+      Q1Max = Q1Max * LengthConversion(InputUnits, InternalUnits)
+      CALL SetFieldFromInput( InputData, "Plot_Q2Min", Q2Min )
+      Q2Min = Q2Min * LengthConversion(InputUnits, InternalUnits)
+      CALL SetFieldFromInput( InputData, "Plot_Q2Max", Q2Max )
+      Q2Max = Q2Max * LengthConversion(InputUnits, InternalUnits)
+      IF ( IndexQ3 /= 0 ) THEN
+         CALL SetFieldFromInput( InputData, "Plot_Q3Min", Q3Min )
+         Q3Min = Q3Min * LengthConversion(InputUnits, InternalUnits)
+         CALL SetFieldFromInput( InputData, "Plot_Q3Max", Q3Max )
+         Q3Max = Q3Max * LengthConversion(InputUnits, InternalUnits)
       ENDIF
+      CALL SetFieldFromInput( InputData, "Plot_QReferenceFile", QReferenceFile )
 
       ! Set variables for minima and TS optimization
       CALL SetFieldFromInput( InputData, "MaxOptSteps", MaxOptSteps, 10**6 )
@@ -107,10 +113,11 @@ MODULE PotentialAnalysis
 
       LengthConv = LengthConversion(InternalUnits,InputUnits)
 
-      WRITE(*, 900) GridSpacing*LengthConv, LengthUnit(InputUnits)
-      WRITE(*, 903) GetXLabel(1), ZHIncMin*LengthConv, ZHIncMax*LengthConv, LengthUnit(InputUnits)
-      WRITE(*, 903) GetXLabel(2), ZHTarMin*LengthConv, ZHTarMax*LengthConv, LengthUnit(InputUnits)
-      IF ( GetSystemDimension( ) == 3 ) WRITE(*, 903) GetXLabel(3), ZCMin*LengthConv, ZCMax*LengthConv, LengthUnit(InputUnits)
+      IF ( IndexQ3 /= 0 )  WRITE(*, 900) GridSpacing*LengthConv, LengthUnit(InputUnits)
+      IF ( IndexQ3 == 0 )  WRITE(*, 904) GridSpacing*LengthConv, LengthUnit(InputUnits)
+      WRITE(*, 903) GetXLabel(IndexQ1), Q1Min*LengthConv, Q1Max*LengthConv, LengthUnit(InputUnits)
+      WRITE(*, 903) GetXLabel(IndexQ2), Q2Min*LengthConv, Q2Max*LengthConv, LengthUnit(InputUnits)
+      IF ( IndexQ3 /= 0 ) WRITE(*, 903) GetXLabel(IndexQ3), Q3Min*LengthConv, Q3Max*LengthConv, LengthUnit(InputUnits)
 
       WRITE(*, 901) MaxOptSteps, OptThreshold*ForceConversion(InternalUnits,InputUnits), &
                     TRIM(EnergyUnit(InputUnits))//"/"//TRIM(LengthUnit(InputUnits))
@@ -120,6 +127,8 @@ MODULE PotentialAnalysis
                     MEPStep*LengthConv, LengthUnit(InputUnits), MaxMEPNrSteps, PrintMEPNrSteps
 
       900 FORMAT(" * Plot of a 3D cut of the potential in VTK format ",         /,&
+                 " * Grid spacing :                                ",F10.4,1X,A   )
+      904 FORMAT(" * Plot of a 2D cut of the potential in VTK format ",         /,&
                  " * Grid spacing :                                ",F10.4,1X,A   )
       903 FORMAT(" * Interval along ",A5, ":                       ",F6.2," / ",F6.2,1X,A)
 
@@ -173,17 +182,17 @@ MODULE PotentialAnalysis
       !> Memory to store data for the 3D potential plot
       TYPE(VTKInfo), SAVE :: PotentialPlot                                   !< VTK data type
       REAL, DIMENSION(:), ALLOCATABLE :: PotentialArray                      !< array to store 2D potential
-      REAL, DIMENSION(:), ALLOCATABLE :: ZCArray, ZHIncArray, ZHTarArray     !< array with coordinates grid
+      REAL, DIMENSION(:), ALLOCATABLE :: Q3Array, Q1Array, Q2Array           !< array with coordinates grid
 
       !> Variables for the MEP analysis
-      REAL, DIMENSION(:), ALLOCATABLE    :: XStart, Dummy
+      REAL, DIMENSION(:), ALLOCATABLE    :: XStart, Dummy, XRef
       LOGICAL, DIMENSION(:), ALLOCATABLE :: LogMask
       REAL, DIMENSION(:), ALLOCATABLE    :: EigenFreq
       REAL, DIMENSION(:,:), ALLOCATABLE  :: EigenModes, Hessian, BlockHessian
       REAL, DIMENSION(:,:), ALLOCATABLE  :: StoreMEP, StoreApproach
       INTEGER, DIMENSION(:), ALLOCATABLE :: Indices
       REAL    :: EStart, E, GradNorm
-      INTEGER :: MEPFullUnit
+      INTEGER :: MEPFullUnit, InputGeomUnit
 
       !> Data for printing MEP in VTK format
       TYPE(VTKInfo), SAVE :: MEPTraj
@@ -203,62 +212,66 @@ MODULE PotentialAnalysis
 
       PRINT "(/,A)",    " **** Write cut of the PES to output VTR ****"
 
+      ! Read from file the value to use for the coordinates which are not scanned
+      InputGeomUnit = LookForFreeUnit()
+      OPEN( FILE= TRIM(ADJUSTL(QReferenceFile)), UNIT=InputGeomUnit )
+      ! Read coordinates
+      ALLOCATE( XRef(NDim) )
+      DO i = 1, NDim
+          READ(InputGeomUnit,*) XRef(i)
+      END DO
+      XRef = XRef*LengthConversion(InputUnits, InternalUnits)
+      ! Close input file
+      CLOSE( InputGeomUnit )
+
       ! Set grid dimensions
-      NpointZHInc = INT((ZHIncMax-ZHIncMin)/GridSpacing) + 1
-      NpointZHTar = INT((ZHTarMax-ZHTarMin)/GridSpacing) + 1
-      IF ( GetSystemDimension( ) == 3 ) THEN
-         NpointZC = INT((ZCMax-ZCMin)/GridSpacing) + 1
-      ELSE
-         NpointZC = 1
-      END IF
+      NpointQ1 = INT((Q1Max-Q1Min)/GridSpacing) + 1
+      NpointQ2 = INT((Q2Max-Q2Min)/GridSpacing) + 1
+      NpointQ3 = 1; IF ( IndexQ3 /= 0 )  NpointQ3 = INT((Q3Max-Q3Min)/GridSpacing) + 1
 
       ! Allocate temporary array to store potential data and coord grids
-      ALLOCATE( PotentialArray( NpointZHInc * NpointZHTar * NpointZC ),   &
-                ZCArray( NpointZC ), ZHIncArray( NpointZHInc ), ZHTarArray( NpointZHTar ) )
+      ALLOCATE( PotentialArray( NpointQ1 * NpointQ2 * NpointQ3 ),   &
+                Q3Array( NpointQ3 ), Q1Array( NpointQ1 ), Q2Array( NpointQ2 ) )
 
       ! Define coordinate grids
-      ZHIncArray = (/ ( ZHIncMin + GridSpacing*(i-1), i=1,NpointZHInc) /)
-      ZHTarArray = (/ ( ZHTarMin + GridSpacing*(i-1), i=1,NpointZHTar) /)
-      IF ( GetSystemDimension( ) == 3 ) THEN
-         ZCArray    = (/ ( ZCMin    + GridSpacing*(i-1), i=1,NpointZC)    /)
-      ELSE
-         ZCArray    = (/ 0.0 /)
-      END IF
+      Q1Array = (/ ( Q1Min + GridSpacing*(i-1), i=1,NpointQ1) /)
+      Q2Array = (/ ( Q2Min + GridSpacing*(i-1), i=1,NpointQ2) /)
+      IF ( IndexQ3 /= 0 )  Q3Array    = (/ ( Q3Min    + GridSpacing*(i-1), i=1,NpointQ3)    /)
 
       ! Open VTK file
-      CALL VTK_NewRectilinearSnapshot(PotentialPlot,FileName="V3D_Plot",X=ZHIncArray*LengthConversion(InternalUnits,InputUnits),&
-                   Y=ZHTarArray*LengthConversion(InternalUnits,InputUnits), Z=ZCArray*LengthConversion(InternalUnits,InputUnits))
+      CALL VTK_NewRectilinearSnapshot(PotentialPlot,FileName="V_Plot",X=Q1Array*LengthConversion(InternalUnits,InputUnits),&
+                   Y=Q2Array*LengthConversion(InternalUnits,InputUnits), Z=Q3Array*LengthConversion(InternalUnits,InputUnits))
 
       nPoint = 0
-      ! Cycle over the ZC coordinate values
-      DO k = 1, NpointZC
-         ! Cycle over the ZHTar coordinate values
-         DO j = 1, NpointZHTar
-            ! Cycle over the ZHTar coordinate values
-            DO i = 1, NpointZHInc
+      ! Cycle over the Q3 coordinate values
+      DO k = 1, NpointQ3
+         ! Cycle over the Q2 coordinate values
+         DO j = 1, NpointQ2
+            ! Cycle over the Q1 coordinate values
+            DO i = 1, NpointQ1
                nPoint = nPoint + 1
+               ! Define coordinates of the point
+               XRef(IndexQ1) = Q1Array(i); XRef(IndexQ2) = Q2Array(j)
+               IF ( IndexQ3 /= 0 ) XRef(IndexQ3) = Q3Array(k)
+!                PRINT*, XRef
                ! Compute potential
-               IF ( GetSystemDimension( ) == 3 ) THEN
-                  PotentialArray(nPoint) = GetPotential( (/ ZHIncArray(i), ZHTarArray(j), ZCArray(k) /) )
-               ELSE IF ( GetSystemDimension( ) == 2 ) THEN
-                  PotentialArray(nPoint) = GetPotential( (/ ZHIncArray(i), ZHTarArray(j) /) )
-               ELSE IF ( GetSystemDimension( ) == 7 ) THEN
-                  PotentialArray(nPoint) = GetPotential( (/ 0.0, 0.0, ZHIncArray(i), 0.0, 0.0, ZHTarArray(j), ZCArray(k) /) )
-               END IF
+               PotentialArray(nPoint) = GetPotential( XRef )
             END DO
          END DO
       END DO
       ! Print the potential to vtk file
       CALL VTK_AddScalarField( PotentialPlot,Name="Potential",Field=PotentialArray*EnergyConversion(InternalUnits,InputUnits), &
                                                                                                             LetFileOpen=.FALSE.)
-      IF ( GetSystemDimension( ) == 3 .OR. GetSystemDimension( ) == 7  ) THEN
-         WRITE(*,"(/,A)") " * 3D PES as a func of zH_inc, zH_tar and zC written as VTR to file V3D_Plot.vtr"
+      IF ( IndexQ3 /= 0  ) THEN
+         WRITE(*,"(/,' * 3D PES as a func of ',A,', ',A,' and ',A,' written as VTR to file V_Plot.vtr')") &
+                  TRIM(ADJUSTL(GetXLabel(IndexQ1))), TRIM(ADJUSTL(GetXLabel(IndexQ2))), TRIM(ADJUSTL(GetXLabel(IndexQ3)))
       ELSE
-         WRITE(*,"(/,A)") " * 2D PES as a func of zH_inc, zH_tar written as VTR to file V3D_Plot.vtr"
+         WRITE(*,"(/,' * 2D PES as a func of ',A,' and ',A,' written as VTR to file V_Plot.vtr')") &
+                  TRIM(ADJUSTL(GetXLabel(IndexQ1))), TRIM(ADJUSTL(GetXLabel(IndexQ2)))
       END IF
 
       ! Deallocate memory
-      DEALLOCATE( PotentialArray, ZCArray, ZHIncArray, ZHTarArray )
+      DEALLOCATE( PotentialArray, Q3Array, Q1Array, Q2Array, XRef )
 
       ! =========================================================
       !                 (2) asymptotic initial geometry
@@ -285,7 +298,6 @@ MODULE PotentialAnalysis
       Hessian(:,:) = GetMassScaledHessian( XStart )
       ! remove unbound coordinates to avoid numerical problems with singular matrix diagonalization
       Indices = GetInitialBoundIndices()
-      PRINT*, Indices
       BlockHessian = Hessian(Indices,Indices)
       ! and diagonalize it
       CALL TheOneWithDiagonalization(BlockHessian, EigenModes, EigenFreq )
