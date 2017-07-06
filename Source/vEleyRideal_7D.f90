@@ -175,12 +175,12 @@
 
   ! derivatives of r wrt the subsystem DOFs
 
-  dr_dxi = (dof(1) - dof(4)) / r_bohr
-  dr_dyi = (dof(2) - dof(5)) / r_bohr
-  dr_dzi = (dof(3) - dof(6)) / r_bohr
-  dr_dxt = (dof(4) - dof(1)) / r_bohr
-  dr_dyt = (dof(5) - dof(2)) / r_bohr
-  dr_dzt = (dof(6) - dof(3)) / r_bohr
+  dr_dxi = (dof(1) - dof(4)) / MAX(r_bohr,0.0001)
+  dr_dyi = (dof(2) - dof(5)) / MAX(r_bohr,0.0001)
+  dr_dzi = (dof(3) - dof(6)) / MAX(r_bohr,0.0001)
+  dr_dxt = (dof(4) - dof(1)) / MAX(r_bohr,0.0001)
+  dr_dyt = (dof(5) - dof(2)) / MAX(r_bohr,0.0001)
+  dr_dzt = (dof(6) - dof(3)) / MAX(r_bohr,0.0001)
 
   ! sum derivatives
   !derivatives of the potential wrt subsytem dofs
