@@ -13,10 +13,10 @@ LOGFILE = yes
 LOGNAME = leporello.log
 
 # Compiler ( gfortran, ifort )
-FC = gfortran
+FC = ifort
 
 # Debugging options ( yes or no )
-DEBUG =  yes 
+DEBUG =  yes  
 
 # Optimization level
 OPTLEVEL = 3
@@ -472,11 +472,11 @@ clean-doc :
 	rm -fr Documentation/latex
 
 # objects with different rules
-${OBJDIR}/vEleyRideal_3D.o : ${SRCDIR}/vEleyRideal_3D.f90
+${OBJDIR}/vEleyRideal_3D.o : ${SRCDIR}/vEleyRideal_3D.f90 Makefile
 	${COMPILE} ${SRCDIR}/vEleyRideal_3D.f90 
 	cp -p vEleyRideal_3D.o ${OBJDIR}
 	rm vEleyRideal_3D.o
-${OBJDIR}/vEleyRideal_7D.o : ${SRCDIR}/vEleyRideal_7D.f90
+${OBJDIR}/vEleyRideal_7D.o : ${SRCDIR}/vEleyRideal_7D.f90 Makefile
 	${COMPILE} ${SRCDIR}/vEleyRideal_7D.f90
 	cp -p vEleyRideal_7D.o ${OBJDIR}
 	rm vEleyRideal_7D.o
@@ -535,7 +535,7 @@ ${OBJDIR}/PotentialModule.o  : ${SRCDIR}/PotentialModule.f90 ${OBJDIR}/vEleyRide
 ${OBJDIR}/SharedData.o : ${SRCDIR}/SharedData.f90 ${OBJDIR}/IndependentOscillatorsModel.o ${COMMONDEP}
 
 # Module containing the subroutine to write data in vtk format
-#${OBJDIR}/PrintTools.o : ${SRCDIR}/PrintTools.f90 ${COMMONDEP}
+${OBJDIR}/PrintTools.o : ${SRCDIR}/PrintTools.f90 ${COMMONDEP}
 
 # Module containing the random number generator
 ${OBJDIR}/RandomNumberGenerator.o : ${SRCDIR}/RandomNumberGenerator.f90 ${COMMONDEP}
