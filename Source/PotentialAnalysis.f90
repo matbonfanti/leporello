@@ -179,8 +179,9 @@ MODULE PotentialAnalysis
       REAL, DIMENSION(:), ALLOCATABLE    :: XStart, Dummy
       LOGICAL, DIMENSION(:), ALLOCATABLE :: LogMask
       REAL, DIMENSION(:), ALLOCATABLE    :: EigenFreq
-      REAL, DIMENSION(:,:), ALLOCATABLE  :: EigenModes, Hessian
+      REAL, DIMENSION(:,:), ALLOCATABLE  :: EigenModes, Hessian, BlockHessian
       REAL, DIMENSION(:,:), ALLOCATABLE  :: StoreMEP, StoreApproach
+      INTEGER, DIMENSION(:), ALLOCATABLE :: Indices
       REAL    :: EStart, E, GradNorm
       INTEGER :: MEPFullUnit
 
@@ -188,7 +189,7 @@ MODULE PotentialAnalysis
       TYPE(VTKInfo), SAVE :: MEPTraj
 
 
-      INTEGER :: i, j, k, nPoint, MaxStep, NPrint
+      INTEGER :: i, j, k, nPoint, MaxStep, NPrint, NScatter
       LOGICAL :: Check
 
       PRINT "(2/,A)",    " ***************************************************"
@@ -265,10 +266,8 @@ MODULE PotentialAnalysis
 
       PRINT "(/,A)",    " **** Starting geometry of the MEP ****"
 
-      ! Allocate arrays for this section
-      ALLOCATE( XStart(NDim), Hessian(NDim, NDim), EigenFreq(NDim), EigenModes(NDim,NDim), LogMask(NDim) )
-      ALLOCATE( Dummy(NDim) )
-      ALLOCATE( StoreApproach(NDim+2,0:1000), StoreMEP(NDim+2,0:MaxMEPNrSteps) )
+      ! Allocate arrays for geometry optimization
+      ALLOCATE( XStart(NDim), LogMask(NDim), Dummy(NDim) )
 
       ! guess reasonable coordinates of the minimum of the PES
       CALL StartSystemForScattering( X, Dummy, MassVector, 10.0/MyConsts_Bohr2Ang, 0.0, 0.0, Task=2 )
@@ -277,11 +276,19 @@ MODULE PotentialAnalysis
       ! Computing the energy at this geometry
       EStart = GetPotAndForces( XStart, A )
 
-      ! Compute normal modes
-      ! Numerical hessian of the system potential
-      Hessian = GetMassScaledHessian( XStart )
-      ! Diagonalize the hessian
-      CALL TheOneWithDiagonalization( Hessian, EigenModes, EigenFreq )
+      ! Arrays for hessian diagonalization
+      NScatter = GetScatterDimension( )
+      ALLOCATE( Hessian(NDim, NDim), Indices(NDim-NScatter), BlockHessian(NDim-NScatter,NDim-NScatter), &
+                EigenFreq(NDim-NScatter), EigenModes(NDim-NScatter,NDim-NScatter))
+
+      ! compute the hessian in mass scaled coordinates
+      Hessian(:,:) = GetMassScaledHessian( XStart )
+      ! remove unbound coordinates to avoid numerical problems with singular matrix diagonalization
+      Indices = GetInitialBoundIndices()
+      PRINT*, Indices
+      BlockHessian = Hessian(Indices,Indices)
+      ! and diagonalize it
+      CALL TheOneWithDiagonalization(BlockHessian, EigenModes, EigenFreq )
 
       WRITE(*,"(/,A)") " Starting geometry and energy of the MEP "
       DO i = 1, NDim
@@ -290,7 +297,7 @@ MODULE PotentialAnalysis
       WRITE(*,502) EStart*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits)
 
       WRITE(*,"(/,A)") " Potential normal modes at the starting geometry"
-      DO i = 1, NDim
+      DO i = 1, NDim-NScatter
          IF ( EigenFreq(i) > 0.0 ) THEN
             WRITE(*,503) i, SQRT(EigenFreq(i))*FreqConversion(InternalUnits,InputUnits), FreqUnit(InputUnits), &
                       TRIM(LengthUnit(InternalUnits)), EigenModes(:,i)
@@ -300,16 +307,28 @@ MODULE PotentialAnalysis
          END IF
       END DO
 
+      DEALLOCATE( Hessian, Indices, BlockHessian, EigenFreq, EigenModes )
+
       ! =========================================================
       !                 (3) minimum energy path
       ! =========================================================
+
+      ! Allocate memory for MEP storage
+      ALLOCATE( StoreApproach(NDim+2,0:1000), StoreMEP(NDim+2,0:MaxMEPNrSteps) )
 
       PRINT "(/,A,/)",    " **** Minimum energy path ****"
       WRITE(*,701)
 
       ! Write header lines screen
-      WRITE(*,700) TRIM(LengthUnit(InputUnits)),TRIM(LengthUnit(InputUnits)),&
-                   TRIM(LengthUnit(InputUnits)),TRIM(EnergyUnit(InputUnits))
+      WRITE(*,698, advance='no')
+      DO i = 1, NDim
+         WRITE(*,"(A10,10X)", advance='no') GetXLabel( i )
+      END DO
+      WRITE(*,699, advance='no') TRIM(EnergyUnit(InputUnits))
+      DO i = 1, NDim
+         WRITE(*,"(A20)", advance='no') TRIM(LengthUnit(InputUnits))
+      END DO
+      WRITE(*,700)
 
       ! Start from XStart
       X(:) = XStart; E = GetPotential( X )
@@ -338,8 +357,15 @@ MODULE PotentialAnalysis
       MEPFullUnit = LookForFreeUnit()
       OPEN( FILE="MEP_Coord_Energy.dat", UNIT=MEPFullUnit )
       ! Header of the output file
-      WRITE(MEPFullUnit,700) TRIM(EnergyUnit(InputUnits)), TRIM(LengthUnit(InputUnits)), &
-                             TRIM(LengthUnit(InputUnits)), TRIM(LengthUnit(InputUnits))
+      WRITE(MEPFullUnit,698, advance='no')
+      DO i = 1, NDim
+         WRITE(MEPFullUnit,"(A10,10X)", advance='no') GetXLabel( i )
+      END DO
+      WRITE(MEPFullUnit,699, advance='no') TRIM(EnergyUnit(InputUnits))
+      DO i = 1, NDim
+         WRITE(MEPFullUnit,"(A20)", advance='no') TRIM(LengthUnit(InputUnits))
+      END DO
+      WRITE(MEPFullUnit,700)
       ! Write approach along the entrance channel
       DO i = 1, NPrint
          WRITE(MEPFullUnit,601) (StoreApproach(1,i)-StoreApproach(1,NPrint))*LengthConversion(InternalUnits, InputUnits), &
@@ -414,6 +440,8 @@ MODULE PotentialAnalysis
       ! Computing the energy at this geometry
       E = GetPotAndForces( X, A )
 
+      ALLOCATE( Hessian(NDim, NDim), EigenFreq(NDim), EigenModes(NDim,NDim))
+
       ! Compute normal modes
       ! Numerical hessian of the system potential
       Hessian = GetMassScaledHessian( X )
@@ -440,19 +468,20 @@ MODULE PotentialAnalysis
       501 FORMAT( " * ",A5,23X,1F15.6,1X,A )
       502 FORMAT( " * Energy",22X,1F15.6,1X,A )
       503 FORMAT( " Normal Mode ",I5," - real frequency: ",1F15.2,1X,A, /, &
-                  "    mass-scaled coords of the normal mode / ",A," : ",4F12.6, / )
+                  "    mass-scaled coords of the normal mode / ",A," : ",1000F12.6, / )
       504 FORMAT( " Normal Mode ",I5," - imag frequency: ",1F15.2,1X,A, /, &
-                  "    mass-scaled coords of the normal mode / ",A," : ",4F12.6, / )
+                  "    mass-scaled coords of the normal mode / ",A," : ",1000F12.6, / )
 
-      601 FORMAT ( F12.4,F20.6,F20.6,F20.6,F20.6 )
-      700 FORMAT ( "#       Step", 10X, "    Energy", 10X, "    zH inc", 10X, "    zH tar", 10X, "        zC", /,  &
-                   "#           ", A20              , A20              , A20              , A20              , /,  &
-                   "#---------------------------------------------------------------------------------------------" )
-      701 FORMAT ( "#---------------------------------------------------------------------------------------------" )
+      601 FORMAT (F12.4,1001F20.6 )
+      698 FORMAT (   "#       Step", 10X, "    Energy", 11X )
+      699 FORMAT (/, "#           ", A20 )
+      700 FORMAT (/,"#------------------------------------------------------------------------------------------------------------")
+      701 FORMAT (  "#------------------------------------------------------------------------------------------------------------")
 
       ! Deallocate memory
-      DEALLOCATE( XStart, Hessian, EigenFreq, EigenModes, LogMask, Dummy )
-      DEALLOCATE( StoreMEP )
+      DEALLOCATE( XStart, LogMask, Dummy )
+      DEALLOCATE( StoreMEP, StoreApproach )
+      DEALLOCATE( Hessian, EigenFreq, EigenModes )
 
    END SUBROUTINE PotentialAnalysis_Run
 
