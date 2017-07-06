@@ -547,7 +547,6 @@ MODULE PotentialModule
             n = n+1
             Indices(n) = i
          END DO
-         PRINT*, Indices
 
       END FUNCTION GetInitialBoundIndices
 
