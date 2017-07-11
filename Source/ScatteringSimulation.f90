@@ -211,6 +211,12 @@ MODULE ScatteringSimulation
       LOGICAL, DIMENSION(:), ALLOCATABLE :: LangevinSwitchOn
       INTEGER :: iCoord
 
+      ! ERRORS FOR FUNCTIONALITIES WHICH ARE NOT YET IMPLEMENTED IN 7D ER
+      IF (GetPotentialID() == ELEYRIDEAL_7D) THEN
+         CALL ERROR( NRhoMax > 0, " non-collinear initial conditions not yet implemented for 7D ER" )
+         CALL ERROR( ZPECorrection, " quasi-classical trajectories not yet implemented for 7D ER")
+      END IF
+
       ! Define the relevant problem dimensions
       NSys = GetSystemDimension()
       IF ( BathType == LANGEVIN_DYN ) THEN
@@ -224,16 +230,19 @@ MODULE ScatteringSimulation
       ! Allocate memory and initialize vectors for trajectory, acceleration and masses
       ALLOCATE( X(NDim), V(NDim), A(NDim), MassVector(NDim), LangevinSwitchOn(NDim) )
 
-      ! Define vector of the masses
-      IF ( BathType == LANGEVIN_DYN ) THEN
-         IF ( NSys == 3 ) THEN
-            MassVector = (/ MassHInc, MassHTar, MassC /)
-         ELSE IF ( NSys == 2 ) THEN
-            MassVector = (/ MassHInc, MassHTar /)
-         END IF
-      ELSE IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
-         MassVector = (/ MassHInc, MassHTar, MassC, (MassBath, iCoord=1,NBath) /)
-      END IF
+      ! Define vector of the masses of the system
+      SELECT CASE( GetPotentialID() )
+         CASE( ELEYRIDEAL_3D )
+            IF ( NSys == 3 ) THEN
+               MassVector(1:3) = (/ MassHInc, MassHTar, MassC /)
+            ELSE IF ( NSys == 2 ) THEN
+               MassVector(1:2) = (/ MassHInc, MassHTar /)
+            END IF
+         CASE( ELEYRIDEAL_7D )
+            MassVector(1:3) = MassHInc; MassVector(4:6) = MassHTar; MassVector(7) = MassC
+      END SELECT
+      ! Define vector of the masses of the bath
+      IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH )  MassVector(NSys+1:) = MassBath
 
       ! Set variables for EOM integration in the microcanonical ensamble (system + bath)
       CALL EvolutionSetup( MolecularDynamics, NDim, MassVector, TimeStep )
@@ -254,7 +263,7 @@ MODULE ScatteringSimulation
 
       ! Set variables for EOM integration with Langevin thermostat, during initial equilibration
       CALL EvolutionSetup( Equilibration, NDim, MassVector, EquilTStep )
-      LangevinSwitchOn = (/ .FALSE., (.TRUE., iCoord=2,NDim ) /)
+      LangevinSwitchOn = (/ (.FALSE., iCoord=1,NScatter), (.TRUE., iCoord=NScatter+1,NDim ) /)
       CALL SetupThermostat( Equilibration, EquilGamma, Temperature, LangevinSwitchOn )
 
       DEALLOCATE( LangevinSwitchOn )
@@ -419,7 +428,7 @@ MODULE ScatteringSimulation
 
       ! scan over the impact parameter...
       ImpactParameter: DO jRho = 0,NRhoMax
-!
+
          ! Set impact parameter and print message
          ImpactPar = float(jRho)*DeltaRho
 
@@ -551,7 +560,8 @@ MODULE ScatteringSimulation
                WRITE(DebugUnitEn,800) 0.0,  EnergyExpect(:)
 
                WRITE( DebugUnitCoord, "(/,A)" ) "# TRAJECTORY COORD: time / fs | X(1) X(2) ... X(N) / bohr "
-               WRITE(DebugUnitCoord,800) 0.0, (/(X(iCoord), iCoord=1,NSys)/), (/(X(iCoord)+0.05*iCoord, iCoord=NSys+1,NDim)/)
+               WRITE(DebugUnitCoord,800) 0.0, (/(X(iCoord), iCoord=1,NSys)/), &
+                             (/(X(iCoord)+0.05*(iCoord-NSys), iCoord=NSys+1,NDim)/)
 
                WRITE( DebugUnitVel, "(/,A)" ) "# TRAJECTORY VELOCITIES: time / fs | X(1) X(2) ... X(N) / au "
                WRITE(DebugUnitVel,800) 0.0, V(:)
@@ -598,8 +608,8 @@ MODULE ScatteringSimulation
                   ! If massive level of output, print traj information to std out
                   IF ( PrintType == DEBUG ) THEN
                      WRITE(DebugUnitEn,800) TimeStep*real(iStep)/MyConsts_fs2AU, EnergyExpect(:)
-                     WRITE(DebugUnitCoord,800) TimeStep*real(iStep)/MyConsts_fs2AU, X(1:4), &
-                                             (/ (X(iCoord+4)+0.05*iCoord, iCoord = 1, NDim-4) /)
+                     WRITE(DebugUnitCoord,800) TimeStep*real(iStep)/MyConsts_fs2AU, &
+                           (/(X(iCoord), iCoord=1,NSys)/), (/(X(iCoord)+0.05*(iCoord-NSys), iCoord=NSys+1,NDim)/)
                      WRITE(DebugUnitVel,800) TimeStep*real(iStep)/MyConsts_fs2AU, V(:)
                   END IF
 
@@ -612,7 +622,7 @@ MODULE ScatteringSimulation
             ! print the final values of this trajectory
             WRITE(*,700) TRIM(GetChannelLabel(GetCurrentChannel(X(1:NSys))))
             DO iCoord = 1,NSys
-               WRITE(*,702) iCoord, X(iCoord)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits)
+               WRITE(*,702) GetXLabel( iCoord ), X(iCoord)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits)
             END DO
             WRITE(*,703) TotEnergy*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits)
 
@@ -746,7 +756,7 @@ MODULE ScatteringSimulation
                   " * Total Energy                     ",1F10.4,1X,A,/ )
 
    700 FORMAT (/, " Trajectory in the ",A," channel " )
-   702 FORMAT (   " * Final system coordinates ",I4,"  ",1F10.4,1X,A )
+   702 FORMAT (   " * Final system coordinates ",A5,"  ",1F10.4,1X,A )
    703 FORMAT (   " * Final energy                     ",1F10.4,1X,A,/ )
 
 
@@ -907,8 +917,13 @@ MODULE ScatteringSimulation
       END IF
 
       ! Compute internal energy corresponding to Hinc-Htar fragment
-      ReducedMass = 1.0/(1./MassVector(1)+1./MassVector(2))
-      Expectations(NSys+5) = 0.5 * ReducedMass * (V(1)-V(2))**2
+      SELECT CASE( GetPotentialID() )
+         CASE( ELEYRIDEAL_3D )
+            ReducedMass = 1.0/(1./MassVector(1)+1./MassVector(2))
+            Expectations(NSys+5) = 0.5 * ReducedMass * (V(1)-V(2))**2
+         CASE( ELEYRIDEAL_7D )
+            Expectations(NSys+5) = 0.0
+      END SELECT
 
       ! Compute potential energy partitioning
       ! NSys+4) potential energy of the carbon for H1 and H2 far from surface at eq position
