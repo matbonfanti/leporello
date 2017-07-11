@@ -1,0 +1,87 @@
+# -------------------- INPUT FILE for fiordiligi (version 3) ------------------------------
+
+# Kind of calculation
+
+# RUNTYPE
+# 4 - Scattering calculation with HInc coming from gas-phase and HTar adsorbed
+# 10 - Static analysis of the potential
+RunType : 4 
+
+# PRINTTYPE
+# 3 - DEBUG fully detailed information about each traj
+# 2 - FULL files to plot the averages over the ensamble
+# 1 - MINIMAL minimal level of output, only final averages
+PrintType : 3
+
+# BATHTYPE
+# 1 - LANGEVIN DYNAMICS - effective relaxation dynamics, with langevin eq of motion
+# 2 - CHAIN BATH - bath of HO in a linear chain form
+# 3 - NORMAL BATH bath of HO on a regular freq grid, all coupled to the system
+BathType : 3
+
+MassBath : 1.0
+NBath : 500
+SpectralDensityFile : spectralC.dat
+BathCutOffFreq : 900.0
+
+# Units
+# Length: 0 = bohr, 1 = Ang
+InputLength : 1
+# Energy: 2 = Hartree, 3 = eV, 4 = kcal/mol, 5 = kJ/mol, 6 = J
+InputEnergy : 3
+# Mass: 7 = au, 8 = amu, 9 = kg
+InputMass   : 8
+# Angle: 10 = radiant, 11 = degrees
+InputAngle  : 11 
+# Time: 12 = au, 13 = fs, 14 = ps
+InputTime   : 13
+# Temperature: 15 = au, 16 = K
+InputTemp   : 16
+# Frequency: 17 = au, 18 = cm^-1 , 19 = fs^-1
+InputFreq   : 18
+
+# Langevin fluctuation/dissipation on the C atom
+# relaxation time 1/gamma (zero means infinite relaxation time!!!)
+RelaxAtCarbon : 0.
+
+# Scattering parameters
+# Kinetic energy of the H atom (normal incidence)
+InitEKin : 0.5
+# Initial height of the H atom
+InitDistance : 6.0
+
+# Evolution parameters
+# Step of the time evolution 
+TimeStep : 0.01
+# Total number of time step per trajectory
+NrOfSteps  :  50000
+# Nr of steps between each analysis
+NrOfPrintSteps  : 1000
+
+# Langevin equilibration parameters
+# Friction coefficient 
+EquilRelaxTime :  50.
+# Time step
+EquilTStep : 0.02
+# Nr of time steps of the equilibration dynamics
+NrEquilibrSteps :  1000000
+ 
+# Masses
+# mass of the target and incident H atom 
+MassHTar  : 1.00782503207
+MassHInc  : 1.00782503207
+# mass of the substrate C atoms 
+MassC  : 12.0
+
+# Temperature of the simulation
+# Temperature of the system / substrate 
+Temperature : 300.0
+# Quasiclassical simulation (ZPE in the bath, Zero Temp)
+ZPECorrection : FALSE
+
+# Sampling parameters
+# number of trajectories per impact parameter
+NrTrajs   : 1000
+
+
+# -------------------------------- END OF INPUT FILE -------------------------------------
