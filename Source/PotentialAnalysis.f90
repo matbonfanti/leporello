@@ -154,19 +154,23 @@ MODULE PotentialAnalysis
    SUBROUTINE PotentialAnalysis_Initialize()
       IMPLICIT NONE
 
+      ! Get the number of dimension of the potential
       NDim = GetSystemDimension()
 
       ! Allocate memory and initialize vectors for positions, forces and masses
       ALLOCATE( X(NDim), A(NDim), MassVector(NDim) )
-      IF ( GetSystemDimension( ) == 3 ) THEN
-         MassVector = (/ MassHInc, MassHTar, MassC /)
-      ELSE IF ( GetSystemDimension( ) == 2 ) THEN
-         MassVector = (/ MassHInc, MassHTar /)
-      ELSE IF ( GetSystemDimension( ) == 7 ) THEN
-         MassVector(1:3) = MassHInc
-         MassVector(4:6) = MassHTar
-         MassVector(7)   = MassC
-      ENDIF
+
+      ! Define vector of the masses
+      SELECT CASE( GetPotentialID() )
+         CASE( ELEYRIDEAL_3D )
+            IF ( NSys == 3 ) THEN
+               MassVector(1:3) = (/ MassHInc, MassHTar, MassC /)
+            ELSE IF ( NSys == 2 ) THEN
+               MassVector(1:2) = (/ MassHInc, MassHTar /)
+            END IF
+         CASE( ELEYRIDEAL_7D )
+            MassVector(1:3) = MassHInc; MassVector(4:6) = MassHTar; MassVector(7) = MassC
+      END SELECT
 
    END SUBROUTINE PotentialAnalysis_Initialize
 
@@ -283,7 +287,7 @@ MODULE PotentialAnalysis
       ALLOCATE( XStart(NDim), LogMask(NDim), Dummy(NDim) )
 
       ! guess reasonable coordinates of the minimum of the PES
-      CALL StartSystemForScattering( X, Dummy, MassVector, 10.0/MyConsts_Bohr2Ang, 0.0, 0.0, Task=2 )
+      CALL StartSystemForScattering( X, Dummy, MassVector, 100.0/MyConsts_Bohr2Ang, 0.0, 0.0, Task=2 )
       LogMask(:) =  GetInitialAsymptoteMask( )
       XStart = NewtonLocator( GetPotAndForces, X, MaxOptSteps, OptThreshold, 1.0, DeltaFiniteDiff, LogMask )
       ! Computing the energy at this geometry
