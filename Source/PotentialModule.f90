@@ -36,7 +36,7 @@ MODULE PotentialModule
 
    PRIVATE
    PUBLIC :: SetupPotential                                        !< setup subroutine
-   PUBLIC :: GetXLabel, GetSystemDimension, GetScatterDimension, PESIsCollinear !< info subroutines
+   PUBLIC :: GetPotentialID, GetXLabel, GetSystemDimension, GetScatterDimension, PESIsCollinear !< info subroutines
    PUBLIC :: GetPotential, GetPotAndForces                         !< get potential and forces
    PUBLIC :: GetVPartitions                                        !< get pot energy partitioned according to some relevant scheme
    PUBLIC :: StartSystemForScattering, GetInitialAsymptoteMask, GetInitialBoundIndices     !< system initial conditions subroutines
@@ -76,9 +76,9 @@ MODULE PotentialModule
    REAL, SAVE  :: OptZc = 0.0
 
    ! Reference geometry values of the potential
-   REAL, PARAMETER  ::  Minimum_ZHTar = 2.7955073359492473  !< equilibrium cartesian Z of HTargon in initial asymptote / bohr
-   REAL, PARAMETER  ::  Minimum_ZCarb = 0.69156392247796172 !< equilibrium cartesian Z of Carbon in initial asymptote / bohr
-   REAL, PARAMETER  ::  H2EqD = 1.51178089965204958905       !< equilibrium distance of H2 in final asymptote / bohr
+   REAL, SAVE  ::  Minimum_ZHTar   !< equilibrium cartesian Z of HTargon in initial asymptote / bohr
+   REAL, SAVE  ::  Minimum_ZCarb   !< equilibrium cartesian Z of Carbon in initial asymptote / bohr
+   REAL, SAVE  ::  H2EqD           !< equilibrium distance of H2 in final asymptote / bohr
 
 
 
@@ -145,6 +145,11 @@ MODULE PotentialModule
                CoordLabels(2) = "Ht_z"
                IF ( VReducedDim ==  FULLPOT )  CoordLabels(3) = "C_z"
 
+               ! Set the asymptotic geometric parameters of the potential
+               Minimum_ZHTar = 2.7955073359492473  !< equilibrium cartesian Z of HTargon in initial asymptote / bohr
+               Minimum_ZCarb = 0.69156392247796172 !< equilibrium cartesian Z of Carbon in initial asymptote / bohr
+               H2EqD = 1.51178089965204958905       !< equilibrium distance of H2 in final asymptote / bohr
+
          ! ====================================================================================================
             CASE(ELEYRIDEAL_7D)
          ! ====================================================================================================
@@ -162,6 +167,11 @@ MODULE PotentialModule
                CoordLabels(5) = "Ht_y"
                CoordLabels(6) = "Ht_z"
                CoordLabels(7) = "C_z"
+
+               ! Set the asymptotic geometric parameters of the potential
+               Minimum_ZHTar = 2.7955073359492473  !< equilibrium cartesian Z of HTargon in initial asymptote / bohr
+               Minimum_ZCarb = 0.69156392247796172 !< equilibrium cartesian Z of Carbon in initial asymptote / bohr
+               H2EqD = 1.51041602401206197923      !< equilibrium distance of H2 in final asymptote / bohr
 
                ! Print warning: energy partition analysis not yet implemented
                CALL ShowWarning("Energy partition between scattering and substrate is not implemented! Zero are returned instead")
@@ -233,6 +243,22 @@ MODULE PotentialModule
          END IF
 
       END SUBROUTINE SetupPotential
+
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Function that returns the identifier of the potential.
+!>
+!> @returns PotID    Integer number identifying the potential to be used
+!**************************************************************************************
+      INTEGER FUNCTION GetPotentialID( ) RESULT( PotID )
+         IMPLICIT NONE
+
+         ! Error if module not have been setup yet
+         CALL ERROR( .NOT. PotentialModuleIsSetup, "PotentialModule.GetPotentialID : Module not Setup" )
+         PotID = PotentialType
+
+      END FUNCTION GetPotentialID
 
 !===============================================================================================================================
 
@@ -628,7 +654,7 @@ MODULE PotentialModule
          IMPLICIT NONE
          REAL, DIMENSION(:), INTENT(IN)           :: Positions
          REAL, DIMENSION(3)                       :: VPart
-         REAL, DIMENSION(3) :: Dummy
+         REAL, DIMENSION(7) :: Dummy, Vector
          REAL :: zC, E1, E2
 
          INTERFACE
@@ -680,7 +706,17 @@ MODULE PotentialModule
             CASE(ELEYRIDEAL_7D)
             ! ====================================================================================================
 
-               VPart = 0.0
+               ! 3 expectation values are computed:
+               ! 1) Compute energy of the carbon for H1 and H2 far from surface at eq position
+               Vector = (/ 0., 0., 100., 0., 0., 100.+H2EqD, Positions(7) ); CALL ER_7D (Vector,  E1, Dummy)
+               Vector = (/ 0., 0., 100., 0., 0., 100.+H2EqD, 0.0 ); CALL ER_7D (Vector,  E2, Dummy)
+               VPart(1) = E1-E2
+               ! 2) Compute energy of H-H far from the surface, for the carbon planar
+               Vector = Position; Vector(3) = Vector(3) + 100.; Vector(6) = Vector(6) + 100.; Vector(7) = 0.0
+               CALL ER_7D (Vector,  VPart(2), Dummy)
+               ! 3) Compute energy of the C-H for the other H far from the surface
+               Vector = Position; Vector(3) = Vector(3) + 100.
+               CALL ER_7D (Vector,  VPart(3), Dummy)
 
          END SELECT
 
