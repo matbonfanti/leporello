@@ -708,14 +708,14 @@ MODULE PotentialModule
 
                ! 3 expectation values are computed:
                ! 1) Compute energy of the carbon for H1 and H2 far from surface at eq position
-               Vector = (/ 0., 0., 100., 0., 0., 100.+H2EqD, Positions(7) ); CALL ER_7D (Vector,  E1, Dummy)
-               Vector = (/ 0., 0., 100., 0., 0., 100.+H2EqD, 0.0 ); CALL ER_7D (Vector,  E2, Dummy)
+               Vector = (/ 0., 0., 100., 0., 0., 100.+H2EqD, Positions(7) /); CALL ER_7D (Vector,  E1, Dummy)
+               Vector = (/ 0., 0., 100., 0., 0., 100.+H2EqD, 0.0 /); CALL ER_7D (Vector,  E2, Dummy)
                VPart(1) = E1-E2
                ! 2) Compute energy of H-H far from the surface, for the carbon planar
-               Vector = Position; Vector(3) = Vector(3) + 100.; Vector(6) = Vector(6) + 100.; Vector(7) = 0.0
+               Vector = Positions; Vector(3) = Vector(3) + 100.; Vector(6) = Vector(6) + 100.; Vector(7) = 0.0
                CALL ER_7D (Vector,  VPart(2), Dummy)
                ! 3) Compute energy of the C-H for the other H far from the surface
-               Vector = Position; Vector(3) = Vector(3) + 100.
+               Vector = Positions; Vector(3) = Vector(3) + 100.
                CALL ER_7D (Vector,  VPart(3), Dummy)
 
          END SELECT

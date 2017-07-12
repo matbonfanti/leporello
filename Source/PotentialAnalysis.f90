@@ -163,9 +163,9 @@ MODULE PotentialAnalysis
       ! Define vector of the masses
       SELECT CASE( GetPotentialID() )
          CASE( ELEYRIDEAL_3D )
-            IF ( NSys == 3 ) THEN
+            IF ( NDim == 3 ) THEN
                MassVector(1:3) = (/ MassHInc, MassHTar, MassC /)
-            ELSE IF ( NSys == 2 ) THEN
+            ELSE IF ( NDim == 2 ) THEN
                MassVector(1:2) = (/ MassHInc, MassHTar /)
             END IF
          CASE( ELEYRIDEAL_7D )
