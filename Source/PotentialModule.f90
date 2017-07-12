@@ -414,7 +414,7 @@ MODULE PotentialModule
 
             CASE(ELEYRIDEAL_7D)
 
-               R = SQRT((Position(1)-Position(3))**2+(Position(2)-Position(4))**2+(Position(3)-Position(6))**2)
+               R = SQRT((Position(1)-Position(4))**2+(Position(2)-Position(5))**2+(Position(3)-Position(6))**2)
                IF ( Position(3) > 20. .AND. Position(6) < 5. ) THEN
                   GetCurrentChannel = 1     ! projectile is reflected to the gas phase, target still bound
                ELSE IF ( Position(3) > 20. .AND. Position(6) > 20. .AND. R < 4.0 ) THEN
