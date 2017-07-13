@@ -54,6 +54,12 @@ MODULE FiniteDifference
       !> Coefficients for 6pts first derivative formula
       REAL, DIMENSION(6), PARAMETER :: CoeffsI = (/ -1./60., 3./20.,  -3./4.,  3./4., -3./20.,   1./60. /)
 
+      ! Finite difference - 3 points formula for first derivative at the right
+      !> Displacements in units of delta for 3pts first right derivative formula
+      REAL, DIMENSION(3), PARAMETER :: ForwardDeltasI = (/  0.0,   +1.0,  +2.0   /)
+      !> Displacements in units of delta for 3pts first right derivative formula
+      REAL, DIMENSION(3), PARAMETER :: ForwardCoeffsI = (/ -3./2., +2.0,  -1./2. /)
+
       ! Finite difference - 9 points formula for second derivative
       !> Displacements in units of delta for 9pts second derivative formula
       REAL, DIMENSION(9), PARAMETER :: DeltasII = &
@@ -232,12 +238,14 @@ FUNCTION GetGradient( AtPoint, GetPotential, DeltaInp ) RESULT( Grad )
 !> @param AtPoint       Input vector with the coords where to compute Hessian
 !> @param GetPotential  Function to evaluate the potential and forces
 !> @param DeltaInp      Optional, magnitude of the finite coords displacements
+!> @param RightDerivInp Optional, compute right derivative instead of centered (logic mask)
 !> @returns             Matrix of 2nd derivatives of the potential in AtPoint
 !**************************************************************************************
-   FUNCTION GetHessianFromForces( AtPoint, GetPotAndForces, DeltaInp ) RESULT( Hessian )
+   FUNCTION GetHessianFromForces( AtPoint, GetPotAndForces, DeltaInp, RightDerivInp ) RESULT( Hessian )
       REAL, DIMENSION(:), INTENT(IN)                 :: AtPoint
       REAL, DIMENSION(size(AtPoint),size(AtPoint))   :: Hessian
       REAL, OPTIONAL                                 :: DeltaInp
+      LOGICAL, DIMENSION(size(AtPoint)), OPTIONAL    :: RightDerivInp
 
       INTERFACE
          REAL FUNCTION GetPotAndForces( X, Force )
@@ -247,6 +255,7 @@ FUNCTION GetGradient( AtPoint, GetPotential, DeltaInp ) RESULT( Grad )
       END INTERFACE
 
       REAL, DIMENSION(size(AtPoint)) :: Coordinates, FirstDerivative
+      LOGICAL, DIMENSION(size(AtPoint))    :: RightDeriv
       REAL :: Potential, SmallDelta
       INTEGER :: i,k
 
@@ -256,25 +265,48 @@ FUNCTION GetGradient( AtPoint, GetPotential, DeltaInp ) RESULT( Grad )
       ELSE
          SmallDelta = SmallDeltaI
       ENDIF
+      ! Define the right derivative logical mask
+      IF (PRESENT(RightDerivInp)) THEN
+         RightDeriv = RightDerivInp
+      ELSE
+         RightDeriv = .FALSE.
+      ENDIF
 
       ! Initialize hessian to 0
       Hessian(:,:) = 0.0
 
       DO i = 1, size(AtPoint)       ! Cycle over the number of coordinates
-         DO k = 1, size(DeltasI)         !  Cycle over the finite displacements
+         IF (RightDeriv(i)) THEN
+            DO k = 1, size(ForwardDeltasI)         !  Cycle over the finite displacements
 
-            ! Define small displacement from the point where compute the derivative
-            Coordinates(:) = AtPoint(:)
-            Coordinates(i) = Coordinates(i) + DeltasI(k)*SmallDelta
+               ! Define small displacement from the point where compute the derivative
+               Coordinates(:) = AtPoint(:)
+               Coordinates(i) = Coordinates(i) + ForwardDeltasI(k)*SmallDelta
 
-            ! Compute potential and forces in the displaced coordinate
-            Potential = GetPotAndForces( Coordinates, FirstDerivative )
-            FirstDerivative = - FirstDerivative
+               ! Compute potential and forces in the displaced coordinate
+               Potential = GetPotAndForces( Coordinates, FirstDerivative )
+               FirstDerivative = - FirstDerivative
 
-            ! Increment numerical derivative of the analytical derivative
-            Hessian(i,:) = Hessian(i,:) + CoeffsI(k)*FirstDerivative(:)
+               ! Increment numerical derivative of the analytical derivative
+               Hessian(i,:) = Hessian(i,:) + ForwardCoeffsI(k)*FirstDerivative(:)
 
-         END DO
+            END DO
+         ELSE IF (.NOT. RightDeriv(i)) THEN
+            DO k = 1, size(DeltasI)         !  Cycle over the finite displacements
+
+               ! Define small displacement from the point where compute the derivative
+               Coordinates(:) = AtPoint(:)
+               Coordinates(i) = Coordinates(i) + DeltasI(k)*SmallDelta
+
+               ! Compute potential and forces in the displaced coordinate
+               Potential = GetPotAndForces( Coordinates, FirstDerivative )
+               FirstDerivative = - FirstDerivative
+
+               ! Increment numerical derivative of the analytical derivative
+               Hessian(i,:) = Hessian(i,:) + CoeffsI(k)*FirstDerivative(:)
+
+            END DO
+         ENDIF
       END DO
 
       ! Divide by the finite displament length
