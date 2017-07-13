@@ -3,7 +3,7 @@
 !***************************************************************************************
 !
 !>  \brief            Wrapper for linear algebra operations
-!>  \details          This module implements some linear algebra operations 
+!>  \details          This module implements some linear algebra operations
 !>                    by referencing either LAPACK or Numerical Recipes for FORTRAN90.\n
 !>                    When the operatios is trivial, it is directly implemented in
 !>                    the module.
@@ -24,25 +24,25 @@
 !
 !>  \todo          Implement matrix inversion with Numerical Recipes
 !>  \todo          Implement computation of euler angles from rotation matrix
-!>  \todo          Implement computation of the euclidean norm 
-!>  \todo          Move NR subroutines to NRUtility module 
+!>  \todo          Implement computation of the euclidean norm
+!>  \todo          Move NR subroutines to NRUtility module
 !
 !***************************************************************************************
 !
-!>  \remark       The module can be preprocessed with both the Numerical Recipes and 
-!>                the LAPACK options, but in this case the LAPACK have priority 
+!>  \remark       The module can be preprocessed with both the Numerical Recipes and
+!>                the LAPACK options, but in this case the LAPACK have priority
 !
 !***************************************************************************************
 !
 !>  \ref         "NUMERICAL RECIPES IN FORTRAN 90:
 !>               The Art of PARALLEL Scientific Computing"
-!>               Chapter B3. Interpolation and Extrapolation 
-!>               ISBN 0-521-57439-0 
-!>               Copyright (C) 1986-1996 by Cambridge University Press 
+!>               Chapter B3. Interpolation and Extrapolation
+!>               ISBN 0-521-57439-0
+!>               Copyright (C) 1986-1996 by Cambridge University Press
 !
 !***************************************************************************************
 
-#if !defined(WITH_LAPACK) 
+#if !defined(WITH_LAPACK)
 #warning "MyLinearAlgebra: LAPACK not available: using NR instead."
 #define WITH_NR
 #else
@@ -56,7 +56,7 @@ MODULE MyLinearAlgebra
 #if defined(WITH_NR)
    USE NRUtility
 #endif
-   
+
    IMPLICIT NONE
 
    INTERFACE TheOneWithMatrixVectorProduct
@@ -73,18 +73,20 @@ MODULE MyLinearAlgebra
 !*******************************************************************************
 !> Subroutine to print a generic matrix, line after line
 !>
-!> @param      Matrix to print 
+!> @param      Matrix to print
 !*******************************************************************************
    SUBROUTINE TheOneWithMatrixPrintedLineAfterLine( Matrix )
       IMPLICIT NONE
       REAL, DIMENSION(:,:), INTENT(IN)               :: Matrix
+      REAL, DIMENSION(SIZE(Matrix,1))                :: Line
       INTEGER :: i
 
-      WRITE(*,"(1X)") 
+      WRITE(*,"(1X)")
       DO i = 1, size(Matrix,1)
-            WRITE(*,'("Line ",I5," : ",1000(F12.6))')  i, Matrix(i,:)
+            Line = Matrix(i,:)
+            WRITE(*,'("Line ",I5," : ",1000(F12.6))')  i, Line
       END DO
-      WRITE(*,"(1X)") 
+      WRITE(*,"(1X)")
 
    END SUBROUTINE TheOneWithMatrixPrintedLineAfterLine
 
@@ -94,7 +96,7 @@ MODULE MyLinearAlgebra
 !*******************************************************************************
 !> Function giving back the identity matrix of size N in real format
 !>
-!> @param      N   size of the output matrix 
+!> @param      N   size of the output matrix
 !> @returns    Identity matrix of size N
 !*******************************************************************************
    FUNCTION TheOneWithIdentityMatrix( N ) RESULT( IdentityMatrix )
@@ -119,7 +121,7 @@ MODULE MyLinearAlgebra
 !*******************************************************************************
 !> Function giving back a diagonal matrix with given diagonal elements
 !>
-!> @param      N   size of the output matrix 
+!> @param      N   size of the output matrix
 !> @param      Vector  diagonal elements
 !> @returns    Diagonal matrix of size N
 !*******************************************************************************
@@ -144,10 +146,10 @@ MODULE MyLinearAlgebra
 !*******************************************************************************
 !          TheOneWithNMinus1SubMatrix
 !*******************************************************************************
-!> Remove the ith row and column from the input matrix, and gives back the 
+!> Remove the ith row and column from the input matrix, and gives back the
 !> so defined submatrix.
 !>
-!> @param      N               size of the input matrix 
+!> @param      N               size of the input matrix
 !> @param      Matrix          input NxN matrix
 !> @param      IndexToRemove   index of the column/row to remove
 !> @returns    SubMatrix       square matrix of dimension N-1
@@ -181,7 +183,7 @@ MODULE MyLinearAlgebra
 !*******************************************************************************
 !> Function giving back the transpose matrix of a given real matrix of size NxM
 !>
-!> @param      Matrix  input matrix 
+!> @param      Matrix  input matrix
 !> @returns    TransposeM     TransposeM of input matrix
 !*******************************************************************************
    FUNCTION TheOneWithTransposeMatrix( Matrix ) RESULT( TransposeM )
@@ -203,8 +205,8 @@ MODULE MyLinearAlgebra
 !*******************************************************************************
 !          TheOneWithOverlapMatrix
 !*******************************************************************************
-!> Function giving back the overlap matrix of a given real matrix of size N 
-!> the overlap matrix is defined as O_{ij} = SUM_{k} M_{ik} M_{jk} 
+!> Function giving back the overlap matrix of a given real matrix of size N
+!> the overlap matrix is defined as O_{ij} = SUM_{k} M_{ik} M_{jk}
 !>
 !> @param      N         size of the input matrix
 !> @param      Matrix    input matrix
@@ -224,7 +226,7 @@ MODULE MyLinearAlgebra
          END DO
       END DO
 
-   END FUNCTION TheOneWithOverlapMatrix   
+   END FUNCTION TheOneWithOverlapMatrix
 
 
 !*******************************************************************************
@@ -246,7 +248,7 @@ MODULE MyLinearAlgebra
       INTEGER                            :: N
       REAL, DIMENSION(N,N), INTENT(IN)   :: Matrix
       REAL, DIMENSION(N,N)               :: Inverse
-      
+
 #if defined(WITH_LAPACK)
       INTEGER( SHORT_INTEGER_KIND )                 :: DimShort, Stat
       REAL, DIMENSION( N, N )                       :: Mat
@@ -260,7 +262,7 @@ MODULE MyLinearAlgebra
 
       ! Initialize inverse as identity matrix
       Inverse = TheOneWithIdentityMatrix( N )
-      
+
 #if defined(WITH_LAPACK)
       ! Make a copy of the input matrix
       Mat = Matrix
@@ -307,17 +309,17 @@ MODULE MyLinearAlgebra
       END IF
 
       Inverse = Mat
-! 
+!
 !       ! Check kind of real data
 !       IF ( KIND( Mat(1,1) ) == SINGLE_PRECISION_KIND ) THEN
 !             ! use lapack routine (single precision, general matrix, linear system solution )
 !             CALL SGESV( DimShort, DimShort, Mat, DimShort, Pivot, Inverse, DimShort, Stat )
-!             
+!
 !       ELSE IF ( KIND( Mat(1,1) ) == DOUBLE_PRECISION_KIND ) THEN
 !             ! use lapack routine (double precision, general matrix, linear system solution )
 !             CALL DGESV( DimShort, DimShort, Mat, DimShort, Pivot, Inverse, DimShort, Stat )
 !       END IF
-! 
+!
 !       ! chech if result is correctly computed
 !       IF ( Stat < 0 ) THEN
 !          WRITE(ErrMsg, *) " TheOneWithInverseMatrix: The argument ", -Stat, " had an illegal value."
@@ -344,9 +346,9 @@ MODULE MyLinearAlgebra
 !> \arg Lapack routines Xpotrf and Xpotrs which factorize the symmetrix positive
 !>   definite matrix and then solve the linear systems
 !>   see  http://www.netlib.org/lapack/lug/node38.html
-!>   
+!>
 !> @param      Matrix     NxN array with the matrix A
-!> @param      Vector     N array with the vector B 
+!> @param      Vector     N array with the vector B
 !> @returns    Solution   N array with the solution of the linear system
 !*******************************************************************************
    FUNCTION TheOneWithSymmetricLinearSystem( Matrix, Vector ) RESULT( Solution )
@@ -360,7 +362,7 @@ MODULE MyLinearAlgebra
       INTEGER( SHORT_INTEGER_KIND )                 :: DimShort, Stat
       CHARACTER(200)                                :: ErrMsg
 #endif
-      
+
 #if defined(WITH_LAPACK)
 
       ! Make a copy of the input matrix
@@ -374,9 +376,9 @@ MODULE MyLinearAlgebra
       ! xPOTRF computes the Cholesky factorization of a real symmetric positive definite matrix A
 
       IF ( KIND( Mat(1,1) ) == SINGLE_PRECISION_KIND ) THEN
-            CALL SPOTRF( "U", DimShort, Mat, DimShort, Stat ) 
+            CALL SPOTRF( "U", DimShort, Mat, DimShort, Stat )
       ELSE IF ( KIND( Mat(1,1) ) == DOUBLE_PRECISION_KIND ) THEN
-            CALL DPOTRF( "U", DimShort, Mat, DimShort, Stat ) 
+            CALL DPOTRF( "U", DimShort, Mat, DimShort, Stat )
       END IF
 
       IF ( Stat < 0 ) THEN
@@ -388,7 +390,7 @@ MODULE MyLinearAlgebra
          CALL AbortWithError( ErrMsg )
       ENDIF
 
-      ! DPOTRS - solve a system of linear equations A*X = B with a symmetric positive definite matrix A using the Cholesky 
+      ! DPOTRS - solve a system of linear equations A*X = B with a symmetric positive definite matrix A using the Cholesky
       !          factorization A = U**T*U or A =  L*L**T computed by DPOTRF
 
       IF ( KIND( Mat(1,1) ) == SINGLE_PRECISION_KIND ) THEN
@@ -449,7 +451,7 @@ MODULE MyLinearAlgebra
       IF ( KIND( Matrix1(1,1) ) == SINGLE_PRECISION_KIND ) THEN
             ! use blas routine (single precision, general matrix, matrix matrix product)
             CALL SGEMM ( 'N', 'N', N1, N2, M, 1.0, Matrix1, N1, Matrix2, M, 0.0, ProductM, N1 )
-            
+
       ELSE IF ( KIND( Matrix1(1,1) ) == DOUBLE_PRECISION_KIND ) THEN
             ! use blas routine (double precision, general matrix, matrix matrix product )
             CALL DGEMM ( 'N', 'N', N1, N2, M, 1.0, Matrix1, N1, Matrix2, M, 0.0, ProductM, N1 )
@@ -467,7 +469,7 @@ MODULE MyLinearAlgebra
 #endif
 
    END FUNCTION TheOneWithMatrixMultiplication
-   
+
 !*******************************************************************************
 !          TheOneWithMatrixVectorProduct
 !*******************************************************************************
@@ -507,7 +509,7 @@ MODULE MyLinearAlgebra
             ! use blas routine (single precision, general matrix, matrix vector product)
 !             CALL SGEMM ( 'N', 'N', N, 1, M, 1.0, Matrix, N, Vector, M, 0.0, ProductV, N )
              CALL SGEMV ( 'N', N, M, 1.0, Matrix, N, Vector, 1, 0.0, ProductV, 1 )
-            
+
       ELSE IF ( KIND( Matrix(1,1) ) == DOUBLE_PRECISION_KIND ) THEN
             ! use blas routine (double precision, general matrix, matrix vector product )
 !             CALL DGEMM ( 'N', 'N', N, 1, M, 1.0, Matrix, N, Vector, M, 0.0, ProductV, N )
@@ -550,7 +552,7 @@ MODULE MyLinearAlgebra
       IF ( KIND( Matrix(1,1) ) == SINGLE_PRECISION_KIND ) THEN
             ! use blas routine (single precision, general matrix, matrix vector product)
              CALL CGEMV ( 'N', N, M, 1.0, Matrix, N, Vector, 1, 0.0, ProductV, 1 )
-            
+
       ELSE IF ( KIND( Matrix(1,1) ) == DOUBLE_PRECISION_KIND ) THEN
             ! use blas routine (double precision, general matrix, matrix vector product )
              CALL ZGEMV ( 'N', N, M, 1.0, Matrix, N, Vector, 1, 0.0, ProductV, 1 )
@@ -567,7 +569,7 @@ MODULE MyLinearAlgebra
 
    END FUNCTION TheOneWithMatrixVectorProduct_CMPLX
 
-   
+
 !*******************************************************************************
 !          TheOneWithVectorDotVector
 !*******************************************************************************
@@ -605,11 +607,11 @@ MODULE MyLinearAlgebra
       ! Check kind of real data
       IF ( KIND( Vector1(1) ) == SINGLE_PRECISION_KIND ) THEN
             ! use blas routine (single precision, vector scalar product)
-             VDotV = SDOT( N, Vector1,1, Vector2,1 ) 
-            
+             VDotV = SDOT( N, Vector1,1, Vector2,1 )
+
       ELSE IF ( KIND( Vector1(1) ) == DOUBLE_PRECISION_KIND ) THEN
             ! use blas routine (double precision, vector scalar product )
-             VDotV = DDOT( N, Vector1,1, Vector2,1 ) 
+             VDotV = DDOT( N, Vector1,1, Vector2,1 )
       END IF
 #endif
 #if !defined(WITH_LAPACK)
@@ -625,9 +627,9 @@ MODULE MyLinearAlgebra
 !*******************************************************************************
 !          TheOneWithDiagonalization
 !*******************************************************************************
-!> Function giving the eigenvectors and eigenvalues of a NxN symmetric real 
+!> Function giving the eigenvectors and eigenvalues of a NxN symmetric real
 !> matrix. The eigenvectors are stored as the columns of the EigenVectors matrix.
-!> Hence the diagonalizaton can be written as: 
+!> Hence the diagonalizaton can be written as:
 !>  [ (EigenVectors)^T * Matrix * EigenVectors ]_ij = delta_ij EigenValues_i \n
 !> This code is a wrapper to the numerical recipe subroutines tred2 and tqli
 !> (householder reduction + QL algorithm )
@@ -653,7 +655,7 @@ MODULE MyLinearAlgebra
       REAL, DIMENSION(:), ALLOCATABLE   :: OffDiagonal
 #endif
       INTEGER  :: N
-      
+
       ! Check and define the dimension of the matrices
       N = size(Matrix,1)
       CALL ERROR( size(Matrix,2) /= N , " TheOneWithDiagonalization: input matrix is not square ")
@@ -696,7 +698,7 @@ MODULE MyLinearAlgebra
 
       EigenVectors=Matrix
       CALL tred2(EigenVectors,EigenValues,OffDiagonal) ! Householder reduction
-      CALL tqli(EigenValues,OffDiagonal,EigenVectors)        ! QL algorithm       
+      CALL tqli(EigenValues,OffDiagonal,EigenVectors)        ! QL algorithm
 
       DEALLOCATE( OffDiagonal )
 #endif
@@ -710,13 +712,13 @@ MODULE MyLinearAlgebra
 !*******************************************************************************
 !          TheOneWithSVD
 !*******************************************************************************
-!> Function giving the singular value decomposition of a MxN real 
+!> Function giving the singular value decomposition of a MxN real
 !> matrix: \n  MATRIX = U * SIGMA * V^T. \n \n
 !> where U is a MxN column-orthogonal matrix, SIGMA is a NxN
-!> diagonal matrix !> and V^T is the transpose of a orthogonal 
+!> diagonal matrix !> and V^T is the transpose of a orthogonal
 !> NxN matrix. \n
 !> This code is a wrapper to the subroutine DGESDD and SGESDD in the LAPACK
-!> library. Numerical recipe will be included at some point. 
+!> library. Numerical recipe will be included at some point.
 !> @ref http://www.netlib.no/netlib/lapack/double/dgesdd.f
 !> @ref http://www.netlib.no/netlib/lapack/double/sgesdd.f
 !>
@@ -733,23 +735,23 @@ MODULE MyLinearAlgebra
       INTEGER(SHORT_INTEGER_KIND)     :: NShort, MShort, One, MinusOne, Stat, LWork
       REAL, DIMENSION(1,1)            :: Dummy
       REAL, DIMENSION(1)              :: OptDim
-      INTEGER(SHORT_INTEGER_KIND), DIMENSION(8*size(SingValues)) :: IntWS 
+      INTEGER(SHORT_INTEGER_KIND), DIMENSION(8*size(SingValues)) :: IntWS
       REAL, DIMENSION(:), ALLOCATABLE  :: Workspace
       INTEGER                          :: StatLong
       CHARACTER(300)                   :: ErrMsg
 #endif
 #if defined(WITH_NR)
       ! HERE VARIABLES FOR NR SVD
-#endif      
+#endif
       INTEGER  :: M, N
-      
+
       ! Check and define the dimension of the matrices
       M = size(Matrix,1)
       N = size(Matrix,2)
       CALL ERROR( size(SingValues) /= N , " TheOneWithSVD: SingValues array mismatch ")
       CALL ERROR( size(Orthogonal,1) /= N , " TheOneWithSVD: Orthogonal array mismatch (1) ")
       CALL ERROR( size(Orthogonal,2) /= N , " TheOneWithSVD: Orthogonal array mismatch (2) ")
-      CALL ERROR( M < N, " TheOneWithSVD: M is less than N ") 
+      CALL ERROR( M < N, " TheOneWithSVD: M is less than N ")
 
 #if defined(WITH_LAPACK)
       NShort = N
@@ -794,15 +796,15 @@ MODULE MyLinearAlgebra
 
    END SUBROUTINE TheOneWithSVD
 
-   
+
 !*******************************************************************************
 !          TheOneWithRankAnalysis
 !*******************************************************************************
-!> 
+!>
 !>
 !> @param    Matrix         N x N  real symmetric matrix.
-!> 
-!> 
+!>
+!>
 !*******************************************************************************
    SUBROUTINE TheOneWithRankAnalysis(Matrix, Eps)
       IMPLICIT NONE
@@ -840,7 +842,7 @@ MODULE MyLinearAlgebra
 !          WRITE(800,*) " removing column ", j
          ReducedBasis =  TheOneWithNMinus1SubMatrix( N, Matrix, j )
          Overlap(1:N-1,1:N-1) = TheOneWithOverlapMatrix( ReducedBasis, N-1 )
-         
+
          ! Diagonalize overlap of N-1 matrices obtained removing nth ROW and nth COLUMN
          CALL TheOneWithDiagonalization( Overlap(1:N-1,1:N-1), EigenVectors(1:N-1,1:N-1), EigenValues(1:N-1) )
 
@@ -856,11 +858,11 @@ MODULE MyLinearAlgebra
          IF ( NrZeroEigenSubMatrix < NrZeroEigen ) WRITE(800,*) " LINEAR DEPENDENCE i = ",j
 
       END DO
-         
+
 
    END SUBROUTINE TheOneWithRankAnalysis
 
-   
+
 !*******************************************************************************
 !          TheOneWithEulerRotation
 !*******************************************************************************
@@ -884,76 +886,76 @@ MODULE MyLinearAlgebra
       ! with rigid frame
 
       ! rotation along Z of angle alpha
-      R1(1,:) = (/ COS( Alpha ), -SIN( Alpha ), 0.0          /) 
-      R1(2,:) = (/ SIN( Alpha ),  COS( Alpha ), 0.0          /) 
-      R1(3,:) = (/ 0.0         ,  0.0         , 1.0          /) 
+      R1(1,:) = (/ COS( Alpha ), -SIN( Alpha ), 0.0          /)
+      R1(2,:) = (/ SIN( Alpha ),  COS( Alpha ), 0.0          /)
+      R1(3,:) = (/ 0.0         ,  0.0         , 1.0          /)
 
       ! rotation along Y of angle beta
-      R2(1,:) = (/ COS( Beta  ) ,  0.0         , SIN( Beta )  /) 
-      R2(2,:) = (/ 0.0          ,  1.0         , 0.0          /) 
-      R2(3,:) = (/ -SIN( Beta  ),  0.0         , COS( Beta  ) /) 
+      R2(1,:) = (/ COS( Beta  ) ,  0.0         , SIN( Beta )  /)
+      R2(2,:) = (/ 0.0          ,  1.0         , 0.0          /)
+      R2(3,:) = (/ -SIN( Beta  ),  0.0         , COS( Beta  ) /)
 
       ! rotation along Z of angle gamma
-      R3(1,:) = (/ COS( Gamma ), -SIN( Gamma ), 0.0          /) 
-      R3(2,:) = (/ SIN( Gamma ),  COS( Gamma ), 0.0          /) 
-      R3(3,:) = (/ 0.0         ,  0.0         , 1.0          /) 
+      R3(1,:) = (/ COS( Gamma ), -SIN( Gamma ), 0.0          /)
+      R3(2,:) = (/ SIN( Gamma ),  COS( Gamma ), 0.0          /)
+      R3(3,:) = (/ 0.0         ,  0.0         , 1.0          /)
 
       ! compose alpha, gamma and beta rotation
       Rotation = TheOneWithMatrixMultiplication( R1, TheOneWithMatrixMultiplication( R2, R3 ) )
 
    END FUNCTION TheOneWithEulerRotation
-   
+
 
 
 ! ## Compute the Euler angles corresponding to a given rotation ( http://en.wikipedia.org/wiki/Euler_angles )
 ! #  @param Rotation 3x3 matrix defining a rotation of the space
 ! #  @return a list with the three parameters alpha, beta, gamma
 ! def EulerAngles( Rotation ):
-! 
+!
 !             z3 = Rotation[2,2]
-! 
+!
 !             # check if beta is equal to 0 or pi
 !             if ( z3 == 1.0 ):
-! 
+!
 !                x = Rotation[0,0]
 !                y = Rotation[1,0]
-! 
+!
 !                # beta is zero
 !                beta = 0.0
 !                # fix gamma = 0
 !                gamma = 0.0
 !                # compute alpha
 !                alpha = math.atan2( y , x )
-! 
+!
 !             elif ( z3 == -1.0 ):
-! 
+!
 !                x = -Rotation[0,0]
 !                y = -Rotation[1,0]
-! 
+!
 !                # beta is pi
 !                beta = math.pi
 !                # fix gamma = 0
 !                gamma = 0.0
 !                # compute alpha
 !                alpha = math.atan2( y , x )
-! 
+!
 !             else:
-! 
+!
 !                # compute proj of z along plane
 !                senbeta = math.sqrt( 1.0 - z3**2 )
-! 
+!
 !                salpha = -Rotation[1,2]/senbeta
 !                calpha = -Rotation[0,2]/senbeta
 !                sgamma = -Rotation[2,1]/senbeta
 !                cgamma = -Rotation[2,0]/senbeta
-! 
+!
 !                # compute beta angle
 !                beta = math.acos( z3 )
 !                # compute alpha
 !                alpha = math.atan2( salpha , calpha )
 !                # compute gamma
 !                gamma = math.atan2( sgamma, cgamma )
-! 
+!
 !             return [ alpha, beta, gamma ]
 
 
@@ -1115,5 +1117,5 @@ END SUBROUTINE tqli
 ! END FUNCTION pythag
 
 #endif
-   
+
 END MODULE MyLinearAlgebra
