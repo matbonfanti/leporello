@@ -16,7 +16,7 @@ LOGNAME = leporello.log
 FC = ifort
 
 # Debugging options ( yes or no )
-DEBUG =  yes  
+DEBUG =  no   
 
 # Optimization level
 OPTLEVEL = 3
@@ -403,7 +403,6 @@ COMPILEFLG += ${OPTFLAGS}
 #----------------------------------------------------------------------------
 
 SRCDIR  = Source
-PPDIR   = PreProcessed
 OBJDIR  = Objects
 TESTDIR = Tests/Source
 EXEDIR  = Executables
@@ -428,7 +427,7 @@ COMPILE                 = ${FC} ${COMPILEFLG} ${MODULEFLG} ${OBJDIR} -c
 LINK                    = ${FC} ${LINKFLG} ${MODULEFLG} ${OBJDIR} -o
 
 # Preprocess: ${PREPROCESS} <to preprocess> <preprocessed>
-PREPROCESS              = cpp -P -traditional ${PPDEFINE}
+PREPROCESS              = -cpp ${PPDEFINE}
 
 # Build static library : ${AR} <libraryname>.a <objects>
 AR 			= ar cr
@@ -439,8 +438,7 @@ AR 			= ar cr
 
 # Link objects to the produce the executable file
 ${EXENAME} : ${SRCDIR}/Main.f90 ${OBJS} 
-	${PREPROCESS} ${SRCDIR}/Main.f90 ${PPDIR}/Main.f90
-	${COMPILE} ${PPDIR}/Main.f90 
+	${COMPILE} ${PREPROCESS} ${SRCDIR}/Main.f90 
 	${LINK} ${EXEDIR}/$@ Main.o $(OBJS) ${LIBFLG}
 	rm Main.o
 
@@ -449,14 +447,13 @@ all : ${OBJS}
 
 # Make a target object file by preprocessing and compiling the fortran code
 ${OBJDIR}/%.o : ${SRCDIR}/%.f90
-	${PREPROCESS} ${SRCDIR}/$*.f90 ${PPDIR}/$*.f90
-	${COMPILE} ${PPDIR}/$*.f90 
+	${COMPILE} ${PREPROCESS} ${SRCDIR}/$*.f90  
 	cp -p $*.o $(shell echo $* | tr A-Z a-z).mod ${OBJDIR}
 	rm $*.o $(shell echo $* | tr A-Z a-z).mod
 
 # Make target to build required directories
 directories : 
-	mkdir -p ${PPDIR} ${OBJDIR} ${EXEDIR}
+	mkdir -p ${OBJDIR} ${EXEDIR}
 
 # Make documentation with doxygen
 doc :
@@ -464,7 +461,7 @@ doc :
 
 # Remove compiled objects and related stuff
 clean :
-	rm -fr ${OBJDIR}/* ${PPDIR}/* 
+	rm -fr ${OBJDIR}/*  
 
 # Clean documentation
 clean-doc :
