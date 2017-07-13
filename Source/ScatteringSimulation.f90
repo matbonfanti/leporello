@@ -325,6 +325,7 @@ MODULE ScatteringSimulation
       REAL, DIMENSION(NDim-NScatter,NDim-NScatter) :: BlockHessian, BlockEigenVec
       REAL, DIMENSION(NDim-NScatter) :: BlockEigenVal
       REAL, DIMENSION(NDim) :: FinalEigenVal
+      LOGICAL, DIMENSION(NDim) :: OptMask
 
 
       IF ( PrintType == DEBUG .AND. .NOT. ZPECorrection ) THEN
@@ -343,44 +344,39 @@ MODULE ScatteringSimulation
       ! Compute the normal modes at the minimum of the asymptotic out configuration
 
       ! Put system in the final scattering equilibrium geometry...
-      CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), 2000., 0.0, 0.0, Task=3 )
+      CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), 100., 0.0, 0.0, Task=3 )
       ! ... and the rest of the degrees of freedom in a good guess for initial minimum
       IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
          X(NSys+1:) = 0.0
       END IF
 
       ! Optimize the potential and find the position of the local minimum
-      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3 )
+      XEquil = NewtonLocator( GetPotAndForces=ScatteringPotential, GetHessian=GetNonMassScaledHessian, StartX=X, NMaxIter=10**3, &
+            GradThresh=1.E-6, DisplThresh=1.E-6, SmallDelta=1.E-3 )
 
       ! compute the hessian in mass scaled coordinates
       Hessian(:,:) = GetMassScaledHessian( XEquil )
       ! and diagonalize it
-      Indices = (/ GetInitialBoundIndices(), ( NSys+iCoord, iCoord=1,NBath ) /)
-      BlockHessian = Hessian(Indices,Indices)
       CALL TheOneWithDiagonalization(Hessian, NormalModesVec, FinalEigenVal )
 
       ! Compute the normal modes at the minimum of the asymptotic incoming configuration
 
       ! Put initial scatterer asymptotically...
-      CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), 2000., 0.0, 0.0, Task=2 )
+      CALL StartSystemForScattering( X(1:NSys), V(1:NSys), MassVector(1:NSys), 100., 0.0, 0.0, Task=2 )
       ! ... and the rest of the degrees of freedom in a good guess for initial minimum
       IF ( BathType ==  NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
          X(NSys+1:) = 0.0
       END IF
 
       ! Optimize the potential and find the position of the local minimum
-      XEquil = NewtonLocator( ScatteringPotential, X, 10**3, 1.E-6, 1.E-6, 1.E-3, &
-             (/ GetInitialAsymptoteMask(), (.TRUE., iCoord=1,NBath ) /) )
+      OptMask = (/ (.FALSE., iCoord=1,NScatter), (.TRUE., iCoord=NScatter+1,NDim ) /)
+      XEquil = NewtonLocator( GetPotAndForces=ScatteringPotential, GetHessian=GetNonMassScaledHessian, StartX=X, NMaxIter=3*10**3, &
+            GradThresh=1.E-6, DisplThresh=1.E-6, SmallDelta=1.E-3, Mask = OptMask )
 
       ! compute the hessian in mass scaled coordinates
       Hessian(:,:) = GetMassScaledHessian( XEquil )
-      ! and diagonalize it
-      Indices = (/ GetInitialBoundIndices(), ( NSys+iCoord, iCoord=1,NBath ) /)
-      BlockHessian = Hessian(Indices,Indices)
-      CALL TheOneWithDiagonalization(BlockHessian, BlockEigenVec, BlockEigenVal )
-      NormalModesVec = 0.0; NormalModesVec(1,1) = 1.0; NormalModesVal(1) = 0.0
-      NormalModesVec(Indices,Indices) = BlockEigenVec
-      NormalModesVal(Indices) = BlockEigenVal
+!       Indices = (/ GetInitialBoundIndices(), ( NSys+iCoord, iCoord=1,NBath ) /)
+      CALL TheOneWithDiagonalization(Hessian, NormalModesVec, NormalModesVal )
 
       IF ( .NOT. ZPECorrection ) THEN
          PRINT "(/,A)" , " Initial conditions for the substrate will be sampled in the normal modes frame of reference"
@@ -416,15 +412,14 @@ MODULE ScatteringSimulation
                "# Normal modes frequencies for the final asymptotic geometry ("//TRIM(FreqUnit(InputUnits))//")"
          DO iCoord = 1, NDim
             IF ( NormalModesVal(iCoord) >= 0. ) THEN
-               WRITE(NrmlMdsUnit,*) iCoord, SQRT(FinalEigenVal(iCoord))*FreqConversion(InternalUnits, InputUnits)
+               WRITE(NrmlMdsUnit,*) iCoord, SQRT(ABS(FinalEigenVal(iCoord)))*FreqConversion(InternalUnits, InputUnits)
             ELSE
-               WRITE(NrmlMdsUnit,*) iCoord, SQRT(-FinalEigenVal(iCoord))*FreqConversion(InternalUnits, InputUnits), " *i"
+               WRITE(NrmlMdsUnit,*) iCoord, SQRT(ABS(FinalEigenVal(iCoord)))*FreqConversion(InternalUnits, InputUnits), " *i"
             ENDIF
          END DO
 
          CLOSE( NrmlMdsUnit )
       END IF
-
 
       ! scan over the impact parameter...
       ImpactParameter: DO jRho = 0,NRhoMax
@@ -483,7 +478,7 @@ MODULE ScatteringSimulation
                ! Do an equilibration run
                EquilibrationCycle: DO iStep = 1, NrEquilibSteps
 
-                  A(1) = 0.0; V(1) = 0.0
+                  A(1:3) = 0.0; V(1:3) = 0.0
 
                   ! PROPAGATION for ONE TIME STEP
                   CALL EOM_LangevinSecondOrder( Equilibration, X, V, A, ScatteringPotential, PotEnergy, RandomNr )
@@ -491,7 +486,7 @@ MODULE ScatteringSimulation
                   ! compute kinetic energy and total energy
                   KinEnergy = EOM_KineticEnergy(Equilibration, V )
                   TotEnergy = PotEnergy + KinEnergy
-                  IstTemperature = 2.0*KinEnergy/(NDim-1)
+                  IstTemperature = 2.0*KinEnergy/(NDim-NScatter)
 
                   ! store temperature average and variance
                   TempAverage = TempAverage + IstTemperature
@@ -831,10 +826,38 @@ MODULE ScatteringSimulation
 !> @returns         Hessian matrix of the potential in AtPoint
 !**************************************************************************************
    FUNCTION GetMassScaledHessian( AtPoint ) RESULT( Hessian )
-      REAL, DIMENSION(NDim), INTENT(IN)  :: AtPoint
-      REAL, DIMENSION(NDim,NDim)         :: Hessian
+      REAL, DIMENSION(NDim), INTENT(IN)            :: AtPoint
+      REAL, DIMENSION(SIZE(AtPoint),SIZE(AtPoint)) :: Hessian
+      INTEGER                  :: i,j
+
+      ! Compute non mass scaled Hessian with the other subroutine
+      Hessian(:,:) = GetNonMassScaledHessian( AtPoint )
+
+      ! Scale with masses
+      DO j = 1, NDim
+         DO i = 1, NDim
+            Hessian(i,j) = Hessian(i,j) / SQRT( MassVector(i)*MassVector(j) )
+         END DO
+      END DO
+
+   END FUNCTION GetMassScaledHessian
+
+!===============================================================================================================================
+
+!**************************************************************************************
+!> Compute the Hessian of the system-bath potential in mass square root scaled
+!> coordinates as it is needed for the normal modes analysis
+!>
+!> @param AtPoint   Input vector with the coordinates where to compute Hessian
+!> @returns         Hessian matrix of the potential in AtPoint
+!**************************************************************************************
+   FUNCTION GetNonMassScaledHessian( AtPoint ) RESULT( Hessian )
+      REAL, DIMENSION(:), INTENT(IN)               :: AtPoint
+      REAL, DIMENSION(SIZE(AtPoint),SIZE(AtPoint)) :: Hessian
 
       REAL, DIMENSION(NBath)   :: CouplingsCoeffs
+      REAL, DIMENSION(NSys)    :: SysCoords
+      LOGICAL, DIMENSION(NSys) :: RightDerivMask
       REAL                     :: DistortionCoeff
       INTEGER                  :: i,j
 
@@ -842,36 +865,48 @@ MODULE ScatteringSimulation
       Hessian(:,:) = 0.0
 
       ! Use subroutine GetHessianFromForces to compute the numerical hessian for the subsystem
-      Hessian(1:NSys,1:NSys) = GetHessianFromForces( AtPoint(1:NSys), GetPotAndForces, 1.E-3 )
-      ! and transform it to mass weighted coordinates
-      DO j = 1, NSys
-         DO i = 1, NSys
-            Hessian(i,j) = Hessian(i,j) / SQRT( MassVector(i)*MassVector(j) )
-         END DO
-      END DO
+      SELECT CASE( GetPotentialID() )
+         CASE( ELEYRIDEAL_3D )
+            Hessian(1:NSys,1:NSys) = GetHessianFromForces( AtPoint(1:NSys), GetPotAndForces, DeltaInp=1.E-3 )
+         CASE( ELEYRIDEAL_7D )
+            SysCoords = AtPoint(1:NSys)
+            IF ( SysCoords(3) > 50.0 .AND. SysCoords(6) < 10.0 ) THEN
+               IF ( SysCoords(4) < 0.0 ) SysCoords(4) = -SysCoords(4)
+               IF ( SysCoords(5) < 0.0 ) SysCoords(5) = -SysCoords(5)
+               IF ( SysCoords(4) < 1.E-1 ) SysCoords(4) = SysCoords(4) + 1.E-1
+               IF ( SysCoords(5) < 1.E-1 ) SysCoords(5) = SysCoords(5) + 1.E-1
+            END IF
+            RightDerivMask = .FALSE.; RightDerivMask(4:5) = .TRUE.
+            Hessian(1:NSys,1:NSys) = GetHessianFromForces( SysCoords, GetPotAndForces, DeltaInp=1.E-6, &
+                                                            RightDerivInp=RightDerivMask)
+      END SELECT
 
       IF ( BathType == NORMAL_BATH .OR. BathType == CHAIN_BATH ) THEN
          ! compute bath hessian, which is computed by the same subroutine, regardless bath type
          CALL  HessianOfTheBath( Bath, Hessian(NSys+1:NDim, NSys+1:NDim) )
+         DO j = NSys+1, NDim
+            DO i = NSys+1, NDim
+               Hessian(i,j) = Hessian(i,j) * SQRT( MassVector(i)*MassVector(j) )
+            END DO
+         END DO
          CALL  CouplingAndDistortionHessian( Bath, CouplingsCoeffs, DistortionCoeff )
 
          ! add the contribution from DISTORTION CORRECTION, equal in normal bath and chain bath
-         Hessian(NCoupled,NCoupled) = Hessian(NCoupled,NCoupled) + DistortionCoeff / MassVector(NCoupled)
+         Hessian(NCoupled,NCoupled) = Hessian(NCoupled,NCoupled) + DistortionCoeff
       END IF
 
       ! Add contribution coming from COUPLING, which is different in Normal and Chain bath
       IF ( BathType == NORMAL_BATH ) THEN
          DO i = NSys+1, NDim
-            Hessian(NCoupled,i) = Hessian(NCoupled,i) + CouplingsCoeffs(i-NSys)/SQRT(MassVector(NCoupled)*MassVector(i) )
-            Hessian(i,NCoupled) = Hessian(i,NCoupled) + CouplingsCoeffs(i-NSys)/SQRT(MassVector(NCoupled)*MassVector(i) )
+            Hessian(NCoupled,i) = Hessian(NCoupled,i) + CouplingsCoeffs(i-NSys)
+            Hessian(i,NCoupled) = Hessian(i,NCoupled) + CouplingsCoeffs(i-NSys)
          END DO
       ELSE IF ( BathType == CHAIN_BATH ) THEN
-         Hessian(NCoupled,NSys+1) = Hessian(NCoupled,NSys+1) + CouplingsCoeffs(1)/SQRT(MassVector(NCoupled)*MassVector(NSys+1))
-         Hessian(NSys+1,NCoupled) = Hessian(NSys+1,NCoupled) + CouplingsCoeffs(1)/SQRT(MassVector(NCoupled)*MassVector(NSys+1))
+         Hessian(NCoupled,NSys+1) = Hessian(NCoupled,NSys+1) + CouplingsCoeffs(1)
+         Hessian(NSys+1,NCoupled) = Hessian(NSys+1,NCoupled) + CouplingsCoeffs(1)
       END IF
 
-   END FUNCTION GetMassScaledHessian
-
+   END FUNCTION GetNonMassScaledHessian
 
 ! ===============================================================================================================================
 
@@ -962,7 +997,7 @@ MODULE ScatteringSimulation
          SigmaV = sqrt( Temperature )
 
          ! the coordinate is bound
-         IF ( NormalModesVal(i) > 0. ) THEN
+         IF ( NormalModesVal(i) > 5.E-6 ) THEN
             ! set frequency of the normal mode
             CarbonFreq = SQRT( NormalModesVal(i) )
 
