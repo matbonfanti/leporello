@@ -532,7 +532,7 @@ MODULE PotentialAnalysis
          CALL ERROR( size(AtPoint) /= NDim, "PotentialModule.GetMassScaledHessian: input array dimension mismatch" )
 
          ! Use subroutine GetHessianFromForces to compute the matrix of the 2nd derivatives
-         Hessian(:,:) = GetHessianFromForces( AtPoint, GetPotAndForces, DeltaFiniteDiff )
+         Hessian(:,:) = GetHessianFromForces( AtPoint, GetPotAndForces, DeltaInp=DeltaFiniteDiff )
          ! Numerical hessian of the potential in mass weighted coordinates
          DO j = 1, NDim
             DO i = 1, NDim
