@@ -15,7 +15,7 @@
 !>
 !***************************************************************************************
 !
-!>  \pre        To use the class the potential needs to be setup with the 
+!>  \pre        To use the class the potential needs to be setup with the
 !>              couplings and the frequencies of the oscillators
 !>              This data is read from input file by the setup subroutine
 !>              and then stored in the BathData object
@@ -23,7 +23,7 @@
 !***************************************************************************************
 !
 !>  \par Updates
-!>  \arg 22 October 2013: to implement the possibility of having multiple baths, 
+!>  \arg 22 October 2013: to implement the possibility of having multiple baths,
 !>             a bath datatype has been implemented and all the subroutine have been adapted accordingly
 !>  \arg 8 Novembre 2013: implemented debug output of frequencies and couplings
 !>  \arg 28 January 2015: non linear coupling implemented for normal bath
@@ -57,7 +57,7 @@ MODULE IndependentOscillatorsModel
 
    INTEGER, PARAMETER :: STANDARD_BATH = 0        ! < normal bath, in which all the oscillators are coupled to the system
    INTEGER, PARAMETER :: CHAIN_BATH    = 1        ! < chain bath, in which all the oscillators are coupled in chain
-    
+
    !> Derived data type to store all the relevant information of a single bath
    TYPE BathData
 !       PRIVATE
@@ -83,7 +83,7 @@ MODULE IndependentOscillatorsModel
    !> Threshold for conjugate gradient convergence
    REAL, PARAMETER :: GradEps = 1.0E-4
 
-CONTAINS   
+CONTAINS
 
 !===============================================================================================================
 
@@ -93,7 +93,7 @@ CONTAINS
 !*******************************************************************************
 !>  This subroutine can be used to setup the parameters of the oscillator bath
 !>  reading the couplings and the frequencies from input file
-!> 
+!>
 !> @param    FileName       Name of the file with the input parameters.
 !*******************************************************************************
    SUBROUTINE SetupIndepOscillatorsModel( Bath, N, SetBathType, FileName, Mass, CutOffFreq, LowerCutOffFreq )
@@ -128,7 +128,7 @@ CONTAINS
       ALLOCATE( Bath%Frequencies(Bath%BathSize), Bath%Couplings(Bath%BathSize) )
 
       ! Check if spectral density file exists
-      INQUIRE( File = TRIM(ADJUSTL(FileName)), EXIST=FileIsPresent ) 
+      INQUIRE( File = TRIM(ADJUSTL(FileName)), EXIST=FileIsPresent )
       CALL ERROR( .NOT. FileIsPresent,            &
                 "IndependentOscillatorsModel.SetupIndepOscillatorsModel: spectral density file does not exists" )
 
@@ -150,12 +150,12 @@ CONTAINS
             ! Read frequencies and couplings
             DO iBath = 1, Bath%BathSize
                READ(InpUnit,*, IOSTAT=RdStatus) Bath%Frequencies(iBath), Bath%Couplings(iBath)
-               ! if data is missing, a rubin continuation of the chain is assumed 
+               ! if data is missing, a rubin continuation of the chain is assumed
                IF ( RdStatus /= 0 ) THEN
                   IF ( CutOffFreq > 0.0 ) THEN
                      Bath%Frequencies(iBath) = CutOffFreq / SQRT(2.)
                      Bath%Couplings(iBath) = 0.4999 * Bath%Frequencies(iBath)**2
-                  ELSE 
+                  ELSE
                      Bath%Frequencies(iBath) = Bath%Frequencies(iBath-1)
                      Bath%Couplings(iBath) = Bath%Couplings(iBath-1)
                   ENDIF
@@ -197,7 +197,7 @@ CONTAINS
             ! Set cutoff frequency
             IF ( CutOffFreq > 0.0 ) THEN
                Bath%CutOff = CutOffFreq               ! if is given from input
-            ELSE 
+            ELSE
                Bath%CutOff = RdSpectralDens( NData )  ! otherwise is the last freq in the input file
             ENDIF
             Bath%DeltaOmega = (Bath%CutOff - Bath%LowerCutOff) / real( Bath%BathSize)
@@ -208,15 +208,15 @@ CONTAINS
             ! initialize distortion constant
             Bath%DistorsionForce = 0.0
 
-            ! Compute frequencies and couplings 
+            ! Compute frequencies and couplings
             D0 = 0.0
             DO iBath = 1,  Bath%BathSize
                Bath%Frequencies(iBath) = Bath%LowerCutOff + iBath * Bath%DeltaOmega
-               Bath%Couplings(iBath) = SQRT( 2.0 * Bath%OscillatorsMass * Bath%Frequencies(iBath) * Bath%DeltaOmega *      & 
+               Bath%Couplings(iBath) = SQRT( 2.0 * Bath%OscillatorsMass * Bath%Frequencies(iBath) * Bath%DeltaOmega *      &
                     ABS(GetSpline( SpectralDensitySpline, Bath%Frequencies(iBath) )) / MyConsts_PI )
                ! Compute force constant of the distorsion
                Bath%DistorsionForce = Bath%DistorsionForce + Bath%Couplings(iBath)**2 / &
-                                                                          ( Bath%OscillatorsMass * Bath%Frequencies(iBath)**2 ) 
+                                                                          ( Bath%OscillatorsMass * Bath%Frequencies(iBath)**2 )
                D0 = D0 + Bath%Couplings(iBath)**2
             ENDDO
             D0 = sqrt(D0)
@@ -253,8 +253,8 @@ CONTAINS
 !*******************************************************************************
 !>  This subroutine can be used to setup the parameters of the oscillator bath
 !>  set the frequency and couplings for an ohmic spectral density with given gamma
-!> 
-!> @param    
+!>
+!> @param
 !*******************************************************************************
    SUBROUTINE SetupOhmicIndepOscillatorsModel( Bath, N, SetBathType, SysMassTimeGamma, BathMass, CutOffFreq )
       IMPLICIT NONE
@@ -295,16 +295,16 @@ CONTAINS
             ! initialize distortion constant
             Bath%DistorsionForce = 0.0
 
-            ! Compute frequencies and couplings 
+            ! Compute frequencies and couplings
             D0 = 0.0
             DO iBath = 1,  Bath%BathSize
                Bath%Frequencies(iBath) = iBath * Bath%DeltaOmega
                SpectralDens = SysMassTimeGamma * Bath%Frequencies(iBath)
-               Bath%Couplings(iBath) = SQRT( 2.0 * Bath%OscillatorsMass * Bath%Frequencies(iBath) * Bath%DeltaOmega *      & 
+               Bath%Couplings(iBath) = SQRT( 2.0 * Bath%OscillatorsMass * Bath%Frequencies(iBath) * Bath%DeltaOmega *      &
                     SpectralDens / MyConsts_PI )
                ! Compute force constant of the distorsion
                Bath%DistorsionForce = Bath%DistorsionForce + Bath%Couplings(iBath)**2 / &
-                                                                          ( Bath%OscillatorsMass * Bath%Frequencies(iBath)**2 ) 
+                                                                          ( Bath%OscillatorsMass * Bath%Frequencies(iBath)**2 )
                D0 = D0 + Bath%Couplings(iBath)**2
             ENDDO
             D0 = sqrt(D0)
@@ -336,8 +336,8 @@ CONTAINS
 !>  Setup non linear coupling between the system and the bath.
 !>  Hcoup = D * (exp(-alpha X)-1) / alpha * s
 !>  where D = sqrt(sum c_k^2)/sqrt(mass) and X = sqrt(mass)*sum c_k q_k
-!> 
-!> @param    
+!>
+!> @param
 !*******************************************************************************
    SUBROUTINE SetNonLinearCoupling( Bath, Alpha )
       IMPLICIT NONE
@@ -387,27 +387,27 @@ CONTAINS
 !*******************************************************************************
 !                     BathPotentialAndForces
 !*******************************************************************************
-!> Compute the potential and derivatives of a generic bath, considering  
+!> Compute the potential and derivatives of a generic bath, considering
 !> the potential terms of the bath and the coupling energy term.
-!> The output variables are incremented (and not initialized to zero) to 
+!> The output variables are incremented (and not initialized to zero) to
 !> allow the use of many baths coupled to the same system.
 !> The opposite of the derivatives are computed, for convenience (the forces are
 !> then computed simply by dividing for the masses)
 !>
-!> @param  Bath        Bath data type 
-!> @param  QCoupl      Value of the linearly coupled coordinate 
-!> @param  QBath       Array with the cartesian coordinates for the system and the bath 
+!> @param  Bath        Bath data type
+!> @param  QCoupl      Value of the linearly coupled coordinate
+!> @param  QBath       Array with the cartesian coordinates for the system and the bath
 !> @param  V           In output, V is incremented Output potential in atomic units
 !> @param  CouplForce  In output, CouplForces is incremented with the derivatives of the coupling potential
 !> @param  QForces     In output, array is incremented with the derivatives of the potential (in au)
-!*******************************************************************************     
-   SUBROUTINE BathPotentialAndForces( Bath, QCoupl, QBath, V, CouplForce, QForces, CouplingV, DTimesEffMode ) 
+!*******************************************************************************
+   SUBROUTINE BathPotentialAndForces( Bath, QCoupl, QBath, V, CouplForce, QForces, CouplingV, DTimesEffMode )
       IMPLICIT NONE
       TYPE(BathData), INTENT(IN)                :: Bath
       REAL, INTENT(IN)                          :: QCoupl
       REAL, DIMENSION(:), INTENT(IN)            :: QBath
       REAL, INTENT(INOUT)                       :: V, CouplForce
-      REAL, DIMENSION(:), INTENT(INOUT)         :: QForces 
+      REAL, DIMENSION(:), INTENT(INOUT)         :: QForces
       REAL, INTENT(OUT), OPTIONAL               :: CouplingV
       REAL, INTENT(OUT), OPTIONAL               :: DTimesEffMode
 
@@ -432,7 +432,7 @@ CONTAINS
          ! COUPLING POTENTIAL AND DISTORSION
          IF ( PRESENT( CouplingV ) ) THEN
             V = V + 0.5 * Bath%DistorsionForce * QCoupl**2
-            CouplingV = CouplingV - Bath%Couplings(1) * QCoupl * QBath(1) 
+            CouplingV = CouplingV - Bath%Couplings(1) * QCoupl * QBath(1)
          ELSE
             V = V - Bath%Couplings(1) * QCoupl * QBath(1) + 0.5 * Bath%DistorsionForce * QCoupl**2
          END IF
@@ -454,7 +454,7 @@ CONTAINS
                   QBath(Bath%BathSize)  + Dn(Bath%BathSize-1) * QBath(Bath%BathSize-1)
 
          ! DERIVATIVE OF THE COUPLING WITH RESPECT TO THE BATH POTENTIAL
-         QForces(1) = QForces(1) + Bath%Couplings(1) * QCoupl 
+         QForces(1) = QForces(1) + Bath%Couplings(1) * QCoupl
 
          ! DERIVATIVE OF THE COUPLING+DISTORSION CORRECTION W.R.T. THE COUPLING COORDINATE
          CouplForce = CouplForce + Bath%Couplings(1) * QBath(1) - Bath%DistorsionForce * QCoupl
@@ -489,7 +489,7 @@ CONTAINS
             TraslCoord = EffMode - Bath%NonLinCoup_Beta * QCoupl
             Expon = EXP( Bath%NonLinCoup_Alpha * TraslCoord )
             ! Add potential correction
-            IF ( PRESENT( CouplingV ) ) THEN 
+            IF ( PRESENT( CouplingV ) ) THEN
                CouplingV = CouplingV + 0.5 * Bath%OscillatorsMass * Bath%NonLinCoup_OmegaBar**2 * &
                                         ( (Expon-1.0)**2/Bath%NonLinCoup_Alpha**2 - TraslCoord**2 )
             ELSE
@@ -516,31 +516,31 @@ CONTAINS
 !*******************************************************************************
 !               BathOfRingsThermalConditions
 !*******************************************************************************
-!> Initial conditions for a bath of ring polymers, corresponding to a bath in 
+!> Initial conditions for a bath of ring polymers, corresponding to a bath in
 !> normal form. The coordinates are sampled from the classical thermal distribution
 !> at given T.
 !>
-!> @param Bath            Bath data type 
+!> @param Bath            Bath data type
 !> @param NBeads          Nr of beads of each ring polymer
 !> @param BeadsFrequency  Frequency of the interbeads harmonic potential
-!> @param Temperature     Temperature of the thermal p and q distribution 
+!> @param Temperature     Temperature of the thermal p and q distribution
 !> @param Q               In output, random initial coordinates of the bath
 !> @param V               In output, random initial velocities of the bath
-!*******************************************************************************  
+!*******************************************************************************
    SUBROUTINE BathOfRingsThermalConditions( Bath, NBeads, BeadsFrequency, Temperature, Q, V,  &
                                                                            PotEnergy, KinEnergy, RandomNr, RingNormalModes )
       IMPLICIT NONE
       TYPE(BathData), INTENT(IN)                         :: Bath
       INTEGER, INTENT(IN)                                :: NBeads
       REAL, INTENT(IN)                                   :: BeadsFrequency, Temperature
-      REAL, DIMENSION(Bath%BathSize,NBeads), INTENT(OUT) :: Q, V 
+      REAL, DIMENSION(Bath%BathSize,NBeads), INTENT(OUT) :: Q, V
       REAL, INTENT(OUT)                                  :: PotEnergy, KinEnergy
       TYPE(RNGInternalState), INTENT(INOUT)              :: RandomNr
       TYPE(FFTHalfComplexType), INTENT(INOUT)            :: RingNormalModes
       REAL, DIMENSION(NBeads)                            :: RingEigenvalues
       REAL, DIMENSION(Bath%BathSize,Bath%BathSize)       :: BathPotentialMatrix, BathNormalModes
       REAL, DIMENSION(Bath%BathSize)                     :: BathEigenvalues
-      REAL, DIMENSION(Bath%BathSize,NBeads)              :: NormalQ, NormalV 
+      REAL, DIMENSION(Bath%BathSize,NBeads)              :: NormalQ, NormalV
       INTEGER :: iBath, iBead
       REAL    :: SigmaV
 
@@ -582,7 +582,7 @@ CONTAINS
          DO iBath = 1, Bath%BathSize
             ! Define random coordinates and velocities in the normal modes representation
             NormalQ(iBath,iBead) = GaussianRandomNr(RandomNr) * SigmaV / SQRT( BathEigenvalues(iBath) + RingEigenvalues(iBead) )
-            NormalV(iBath,iBead) = GaussianRandomNr(RandomNr) * SigmaV            
+            NormalV(iBath,iBead) = GaussianRandomNr(RandomNr) * SigmaV
             ! Compute kinetic and potential energies in normal mode representation
             PotEnergy = PotEnergy + 0.5 * Bath%OscillatorsMass * &
                                            (BathEigenvalues(iBath) + RingEigenvalues(iBead) ) * NormalQ(iBath,iBead)**2
@@ -592,8 +592,8 @@ CONTAINS
 
       ! Transform normal modes of the ring polymer to ring polymer coordinates
       DO iBath = 1, Bath%BathSize
-         CALL ExecuteFFT( RingNormalModes, NormalQ(iBath,:), INVERSE_FFT ) 
-         CALL ExecuteFFT( RingNormalModes, NormalV(iBath,:), INVERSE_FFT ) 
+         CALL ExecuteFFT( RingNormalModes, NormalQ(iBath,:), INVERSE_FFT )
+         CALL ExecuteFFT( RingNormalModes, NormalV(iBath,:), INVERSE_FFT )
       END DO
 
       ! Transform normal modes of the bath to original representation
@@ -618,11 +618,11 @@ CONTAINS
 !> Note that for a linear chain, also the couplings within the chain are assumed
 !> to be zero.
 !>
-!> @param Bath         Bath data type 
+!> @param Bath         Bath data type
 !> @param Positions    In output, random initial coordinates of the bath
 !> @param Velocities   In output, random initial velocities of the bath
-!> @param Temperature  Temperature of the classical distribution 
-!*******************************************************************************     
+!> @param Temperature  Temperature of the classical distribution
+!*******************************************************************************
    SUBROUTINE ThermalEquilibriumBathConditions( Bath, Positions, Velocities, Temperature, RandomNr )
       IMPLICIT NONE
 
@@ -633,7 +633,7 @@ CONTAINS
 
       REAL :: SigmaQ, SigmaV
       INTEGER :: iBath
-      
+
       ! Check if the bath is setup
       CALL ERROR( .NOT. Bath%BathIsSetup, "IndependentOscillatorsModel.ThermalEquilibriumBathConditions: bath not setup" )
 
@@ -650,7 +650,7 @@ CONTAINS
          Positions(iBath) = GaussianRandomNr(RandomNr) * SigmaQ
          Velocities(iBath) = GaussianRandomNr(RandomNr) * SigmaV
       END DO
-   
+
    END SUBROUTINE ThermalEquilibriumBathConditions
 
 
@@ -660,16 +660,16 @@ CONTAINS
 !*******************************************************************************
 !                     ZeroKelvinBathConditions
 !*******************************************************************************
-!> Setup initial conditions for the system plus bath for a simulation of 
+!> Setup initial conditions for the system plus bath for a simulation of
 !> vibrational relaxation. The bath can be fixed in the equilibrium position
-!> with no momentum ( classical 0K ) or in a quasiclassical state with the 
-!> quantum initial zero point energy. 
+!> with no momentum ( classical 0K ) or in a quasiclassical state with the
+!> quantum initial zero point energy.
 !> Data are initialized in ATOMIC UNITS.
 !>
-!> @param Bath         Bath data type 
+!> @param Bath         Bath data type
 !> @param Positions    In output, random initial coordinates of the bath
 !> @param Velocities   In output, random initial velocities of the bath
-!*******************************************************************************     
+!*******************************************************************************
    SUBROUTINE ZeroKelvinBathConditions( Bath, Positions, Velocities, ZeroPointEnergy, RandomNr )
       IMPLICIT NONE
 
@@ -721,19 +721,19 @@ CONTAINS
 !> Compute the potential energy of the bath, the coupling energy and optionally
 !> also the first effective mode (not normalized).
 !>
-!> @param Bath                   Bath data type 
+!> @param Bath                   Bath data type
 !> @param QCoupl                 Coupling coordinates (shifted if necessary)
 !> @param QBath                  Bath coordinates
 !> @param VCoupling              After execution, stores the coupling energy
 !> @param VCoupling              After execution, stores the energy of the bath
-!> @param FirstEffectiveMode     (OPTIONAL) After execution, 
+!> @param FirstEffectiveMode     (OPTIONAL) After execution,
 !>                               stores the 1st effective mode, not normalized
-!*******************************************************************************     
+!*******************************************************************************
    SUBROUTINE EnergyOfTheBath( Bath, QCoupl, QBath, VCoupling, VBath, FirstEffectiveMode )
       IMPLICIT NONE
       TYPE(BathData), INTENT(IN)     :: Bath
-      REAL, INTENT(IN)               :: QCoupl 
-      REAL, INTENT(IN), DIMENSION(:) :: QBath 
+      REAL, INTENT(IN)               :: QCoupl
+      REAL, INTENT(IN), DIMENSION(:) :: QBath
       REAL, INTENT(OUT)              :: VCoupling, VBath
       REAL, OPTIONAL, INTENT(OUT)    :: FirstEffectiveMode
       REAL :: Coupl
@@ -769,7 +769,7 @@ CONTAINS
             Coupl = Coupl +  Bath%Couplings(iBath) * QBath(iBath)
             VBath = VBath + 0.5 * Bath%OscillatorsMass * ( Bath%Frequencies(iBath) * QBath(iBath) )**2
          END DO
-         VCoupling = - Coupl * QCoupl 
+         VCoupling = - Coupl * QCoupl
          VBath = VBath + 0.5 * Bath%DistorsionForce * QCoupl**2
          IF( PRESENT( FirstEffectiveMode ) ) FirstEffectiveMode = Coupl
 
@@ -795,9 +795,9 @@ CONTAINS
 !*******************************************************************************
 !> Give the distorsion force, stored in the bath data type.
 !>
-!> @param   Bath     Bath data type 
-!> @result  Dist     Distorsion force of the bath     
-!*******************************************************************************     
+!> @param   Bath     Bath data type
+!> @result  Dist     Distorsion force of the bath
+!*******************************************************************************
    REAL FUNCTION GetDistorsionForce( Bath ) RESULT( Dist)
       IMPLICIT NONE
       TYPE(BathData), INTENT(IN)     :: Bath
@@ -812,13 +812,13 @@ CONTAINS
 !*******************************************************************************
 !> Give the distorsion force, stored in the bath data type.
 !>
-!> @param   Bath     Bath data type 
+!> @param   Bath     Bath data type
 !> @result  Coords   Coordinates of the bath
-!*******************************************************************************     
+!*******************************************************************************
    REAL FUNCTION GetFirstEffectiveMode( Bath, QBath )
       IMPLICIT NONE
       TYPE(BathData), INTENT(IN)     :: Bath
-      REAL, INTENT(IN), DIMENSION(:) :: QBath 
+      REAL, INTENT(IN), DIMENSION(:) :: QBath
       REAL :: Coupl, DSq
       INTEGER  :: iBath
 
@@ -854,10 +854,10 @@ CONTAINS
 !> potential and the distortion force.
 !>  NOTE THAT RESULTS ARE NOT MASS SCALED
 !>
-!> @param   Bath     Bath data type 
-!> @result  Dist     Distortion force of the bath     
-!*******************************************************************************     
-   SUBROUTINE CouplingAndDistortionHessian( Bath, CouplingHessian, DistortionHessian ) 
+!> @param   Bath     Bath data type
+!> @result  Dist     Distortion force of the bath
+!*******************************************************************************
+   SUBROUTINE CouplingAndDistortionHessian( Bath, CouplingHessian, DistortionHessian )
       IMPLICIT NONE
       TYPE(BathData), INTENT(IN)                    :: Bath
       REAL, DIMENSION( Bath%BathSize ), INTENT(OUT) :: CouplingHessian
@@ -883,10 +883,10 @@ CONTAINS
 !> Compute the Hessian of the potential of the bath only
 !> divided by the masses to work with mass weighted coordianates
 !>
-!> @param Bath       Bath data type 
+!> @param Bath       Bath data type
 !> @param Hessian    output matrix of size NxN, where N is the size of the bath
-!*******************************************************************************     
-   SUBROUTINE HessianOfTheBath( Bath, Hessian ) 
+!*******************************************************************************
+   SUBROUTINE HessianOfTheBath( Bath, Hessian )
       IMPLICIT NONE
       TYPE(BathData), INTENT(IN)  :: Bath
       REAL, DIMENSION(Bath%BathSize, Bath%BathSize), INTENT(INOUT) :: Hessian
@@ -927,7 +927,7 @@ CONTAINS
 !*******************************************************************************
 !>  Deallocate memory used by the Bath data type
 
-!> @param Bath       Bath data type 
+!> @param Bath       Bath data type
 !*******************************************************************************
    SUBROUTINE DisposeIndepOscillatorsModel( Bath )
       IMPLICIT NONE
