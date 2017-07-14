@@ -315,26 +315,33 @@ MODULE ScatteringSimulation
 !**************************************************************************************
    SUBROUTINE Scattering_Run()
       IMPLICIT NONE
+
       ! Output units
       INTEGER :: TEquilUnit, DebugUnitEn, DebugUnitCoord, DebugUnitVel       ! DEBUG
-      INTEGER  ::  CollinearProbUnit, EnergyAverUnit, NrmlMdsUnit!, CrossSectionUnit, OpacityUnit
+      INTEGER  ::  CollinearProbUnit, EnergyAverUnit, NrmlMdsUnit, CrossSectionUnit, OpacityUnit
       CHARACTER(100) :: OutFileName                                          ! string to define output file name
+
       ! Integer indices
       INTEGER  ::  jRho, iTraj, iStep, kStep, iCoord, iChan
+
       ! Real variables
-      REAL     ::  ImpactPar, Time, CrossSection
+      REAL     ::  ImpactPar, Time, NormalRho
       REAL     ::  TotEnergy, PotEnergy, KinEnergy, KinScatter, KinSubstrate  ! Energy values
       REAL     ::  TempAverage, TempVariance, IstTemperature                  ! Temperature values
+
+      ! Temporary array to store results
       REAL, DIMENSION(NrEnAverages) :: EnergyExpect                           ! Array to store energy values
-      ! arrays to store grids useful for results output
+      REAL, DIMENSION(SIZE(TrajOutcome,1)) :: CrossSection                    ! Temporaray array to store cross section at tstep
+
+      ! arrays to store grids for results output
       REAL, DIMENSION(NRhoMax+1) :: ImpactParameterGrid
       REAL, DIMENSION(NrOfPrintSteps) :: TimeGrid
+
       ! VTK file format
       TYPE(VTKInfo), SAVE :: PrintChannelP                                    !< derived datatype to print resolved probability
+
       ! temporary subarrays for diagonalization
       INTEGER, DIMENSION(NDim-NScatter) :: Indices
-      REAL, DIMENSION(NDim-NScatter,NDim-NScatter) :: BlockHessian, BlockEigenVec
-      REAL, DIMENSION(NDim-NScatter) :: BlockEigenVal
       REAL, DIMENSION(NDim) :: FinalEigenVal
       LOGICAL, DIMENSION(NDim) :: OptMask
 
@@ -667,9 +674,17 @@ MODULE ScatteringSimulation
                                       iStep= 1,NrOfPrintSteps  )/)
       ImpactParameterGrid = (/( float(jRho)*DeltaRho*LengthConversion(InternalUnits,InputUnits), jRho = 0,NRhoMax  )/)
 
+      !==============================================================================================================
+      !    VTK FILE WITH CHANNEL PROBABILITIES VS RHO AND TIME
+      !==============================================================================================================
+
+      ! When calculation is done with off-collinear initial conditions, print channels over time and rho to vtk
       IF ( NRhoMax > 0 ) THEN
-         ! Print trapping to vtk file
+
+         ! Open vtk, x is impact parameter, y is time
          CALL VTK_NewRectilinearSnapshot( PrintChannelP, X=ImpactParameterGrid, Y=TimeGrid, FileName="ChannelProb" )
+
+         ! For each channel, add new dataset with probability over rho and time
          DO iChan = 0, GetNrChannels( )-2
             CALL VTK_AddScalarField( PrintChannelP, TRIM( GetChannelLabel(iChan) ), &
                      RESHAPE(TrajOutcome(iChan,:,:), (/ NrOfPrintSteps*(NRhoMax+1) /)), LetFileOpen=.TRUE. )
@@ -678,27 +693,58 @@ MODULE ScatteringSimulation
                   RESHAPE(TrajOutcome(GetNrChannels( )-1,:,:), (/ NrOfPrintSteps*(NRhoMax+1) /)) )
       END IF
 
+      !==============================================================================================================
+      !    DAT FILE WITH COLLINEAR CHANNEL PROBABILITIES VS TIME
+      !==============================================================================================================
+
       ! Print to file collinear trapping
       CollinearProbUnit = LookForFreeUnit()
       OPEN( FILE="CollinearProbabilities.dat", UNIT=CollinearProbUnit )
       WRITE(CollinearProbUnit, "(100A)") "# probability vs t (" // TRIM(TimeUnit(InputUnits)) // &
           ") -",(/ (GetChannelLabel( iChan ), iChan = 0, GetNrChannels( )-1) /)
+
+      ! Write channel resolved probabilities for jRho == 0 to the output file
       DO iStep= 1,NrOfPrintSteps
          WRITE(CollinearProbUnit,800) TimeGrid(iStep), TrajOutcome(:,0,iStep)
       END DO
+
+      ! Close file
       CLOSE(CollinearProbUnit)
+
+      !==============================================================================================================
+      !    DAT FILE WITH AVARAGE ENERGY PER CHANNEL IN TIME, AT FIXED RHO AND AVERAGED OVER RHO (PRINTTYPE FULL)
+      !==============================================================================================================
 
       ! Print to file the average energies
       IF ( PrintType >= FULL ) THEN
          EnergyAverUnit = LookForFreeUnit()
+
          ! Loop over the channels (one file per channel)
          DO iChan = 0, GetNrChannels( )-1
+
             ! Set file name and open unit
             WRITE(OutFileName,"(A,I3.3,A)") "AvEnergy_Channel_",iChan,".dat"
             OPEN( FILE=TRIM(OutFileName), UNIT=EnergyAverUnit )
             WRITE(EnergyAverUnit,"(A,/)")  "# Energy averages for channel: "//GetChannelLabel(iChan)
             WRITE(EnergyAverUnit,"(A,2/)") "# time / "// TRIM(TimeUnit(InputUnits)) // &
                " | K_sub(NSys), K_bath, V_sub, V_bath, V_coup, V_part(...) / " // TRIM(EnergyUnit(InputUnits))
+
+            IF ( NRhoMax > 0 ) THEN
+               WRITE(EnergyAverUnit,"(A,/)")  "# Average over impact parameters "
+               ! Loop over time, average over rho and print averaged energy
+               DO iStep= 1, NrOfPrintSteps
+                  ! Accumulate average
+                  EnergyExpect = 0.0
+                  DO jRho = 0, NRhoMax
+                     EnergyExpect(:) = EnergyExpect(:) + EnergyAver(:,iChan,jRho,iStep)*jRho
+                  END DO
+                  ! Normalize EnergyExpect
+                  EnergyExpect(:) = EnergyExpect(:) / (FLOAT(NRhoMax*(NRhoMax+1))/2.0)
+                  ! Print the average
+                  WRITE(EnergyAverUnit,800) TimeGrid(iStep), EnergyExpect(:)*EnergyConversion(InternalUnits,InputUnits)
+               END DO
+            END IF
+
             ! Loop over the impact parameter (section per each impact values are appended one after the other)
             DO jRho = 0, NRhoMax
                WRITE(EnergyAverUnit,"(A,F15.6,A/)")  "# Impact parameters ",ImpactParameterGrid(jRho+1),LengthUnit(InputUnits)
@@ -707,48 +753,56 @@ MODULE ScatteringSimulation
                      EnergyAver(:,iChan,jRho,iStep)*EnergyConversion(InternalUnits,InputUnits)
                END DO
             END DO
+
             ! Close unit
             CLOSE(EnergyAverUnit)
          END DO
       END IF
 
-!       ! write cross section data
-!       IF ( NRhoMax > 0 ) THEN
-!
-!          ! open file and write header
-!          CrossSectionUnit = LookForFreeUnit()
-!          OPEN( FILE="CrossSection.dat", UNIT=CrossSectionUnit )
-!          WRITE(CrossSectionUnit, "(A,I6,A,/)") "# cross section vs time (" // TRIM(TimeUnit(InputUnits)) // &
-!              " | " // TRIM(LengthUnit(InputUnits)) //"^2) -",NrTrajs, " trajs"
-!
-!          ! loop over time steps, compute and write trapping cross section
-!          DO iStep= 1,NrOfPrintSteps
-!
-!             ! integrate over impact parameter
-!             CrossSection=0.0
-!             DO jRho = 0, NRhoMax
-!                CrossSection = CrossSection + TrappingProb(jRho,iStep) * float(jRho)*DeltaRho
-!             END DO
-!             CrossSection = 2.0*MyConsts_PI * DeltaRho * CrossSection * LengthConversion(InternalUnits,InputUnits)**2
-!
-!             ! print trapping cross section to file
-!             WRITE(CrossSectionUnit,800) TimeGrid(iStep), CrossSection
-!
-!          END DO
-!
-!          ! Print to file final opacity function
-!          OpacityUnit = LookForFreeUnit()
-!          OPEN( FILE="OpacityFunction.dat", UNIT=OpacityUnit )
-!          WRITE(OpacityUnit, "(A,F8.2,A,/)") "# opacity function @ time ", &
-!             float(PrintStepInterval*iStep)*TimeStep*TimeConversion(InternalUnits,InputUnits), " "//TRIM(TimeUnit(InputUnits))
-!          DO jRho = 0,NRhoMax
-!            WRITE(OpacityUnit,800) ImpactParameterGrid(jRho+1), TrappingProb(jRho,NrOfPrintSteps)
-!          END DO
-!          CLOSE(OpacityUnit)
-!
-!       END IF
+      ! the rest of the files is printed only when off-collinear incidence is considered
+      IF ( NRhoMax > 0 ) THEN
 
+      !==============================================================================================================
+      !    DAT FILE WITH CHANNELS CROSS SECTIONS OVER TIME
+      !==============================================================================================================
 
+         ! open file and write header
+         CrossSectionUnit = LookForFreeUnit()
+         OPEN( FILE="CrossSection.dat", UNIT=CrossSectionUnit )
+         WRITE(CrossSectionUnit, "(100A,/)") "# cross section vs time (" // TRIM(TimeUnit(InputUnits)) // " | " // &
+           TRIM(LengthUnit(InputUnits)) //"^2) -","Channels: ", (/ (GetChannelLabel( iChan ), iChan = 0, GetNrChannels()-1) /)
+
+         ! loop over time steps, compute and write trapping cross section
+         DO iStep= 1,NrOfPrintSteps
+
+            ! integrate over impact parameter
+            CrossSection=0.0
+            DO jRho = 0, NRhoMax
+               CrossSection = CrossSection + TrajOutcome(:,jRho,iStep) * float(jRho)
+            END DO
+            CrossSection = 2.0*MyConsts_PI * DeltaRho**2 * CrossSection * LengthConversion(InternalUnits,InputUnits)**2
+
+            ! print trapping cross section to file
+            WRITE(CrossSectionUnit,800) TimeGrid(iStep), CrossSection
+
+         END DO
+
+      !==============================================================================================================
+      !    DAT FILE WITH OPACITY FUNCTIONS AT THE FINAL STEP
+      !==============================================================================================================
+
+         ! Print to file final opacity function
+         OpacityUnit = LookForFreeUnit()
+         OPEN( FILE="OpacityFunction.dat", UNIT=OpacityUnit )
+         WRITE(OpacityUnit, "(A,F8.2,A,/)") "# opacity function @ time ", &
+            float(PrintStepInterval*iStep)*TimeStep*TimeConversion(InternalUnits,InputUnits), " "//TRIM(TimeUnit(InputUnits))
+         WRITE(OpacityUnit,"(100A,/)") "# Channels: ", (/ (GetChannelLabel( iChan ), iChan = 0, GetNrChannels()-1) /)
+         DO jRho = 0,NRhoMax
+           WRITE(OpacityUnit,800) ImpactParameterGrid(jRho+1), TrajOutcome(:,jRho,NrOfPrintSteps)
+         END DO
+         CLOSE(OpacityUnit)
+
+      END IF
 
    500 FORMAT (/, " Equilibration averages                 ",/     &
                   " * Average temperature              ",1F10.4,1X,A,/ &
