@@ -223,11 +223,6 @@ MODULE ScatteringSimulation
       LOGICAL, DIMENSION(:), ALLOCATABLE :: LangevinSwitchOn
       INTEGER :: iCoord
 
-      ! ERRORS FOR FUNCTIONALITIES WHICH ARE NOT YET IMPLEMENTED IN 7D ER
-      IF (GetPotentialID() == ELEYRIDEAL_7D) THEN
-         CALL ERROR( NRhoMax > 0, " non-collinear initial conditions not yet implemented for 7D ER" )
-      END IF
-
       ! Define the relevant problem dimensions
       NSys = GetSystemDimension()
       IF ( BathType == LANGEVIN_DYN ) THEN
