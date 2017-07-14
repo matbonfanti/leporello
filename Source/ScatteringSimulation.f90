@@ -161,14 +161,20 @@ MODULE ScatteringSimulation
          WRITE(*, 901) NrTrajs
       END IF
 
-      WRITE(*, 902) InitDistance*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits), &
-                    InitEKin*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits)
+      IF ( NRhoMax == 0 ) THEN
+         WRITE(*, 902) InitDistance*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits), &
+                       InitEKin*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits)
+      ELSE IF ( NRhoMax > 0 ) THEN
+         WRITE(*, 903) InitDistance*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits), &
+                       InitEKin*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits), NRhoMax, &
+                       DeltaRho*float(NRhoMax)*LengthConversion(InternalUnits,InputUnits), LengthUnit(InputUnits)
+      END IF
 
-      WRITE(*, 903) TimeStep*TimeConversion(InternalUnits,InputUnits), TimeUnit(InputUnits), &
+      WRITE(*, 904) TimeStep*TimeConversion(InternalUnits,InputUnits), TimeUnit(InputUnits), &
                     TimeStep*NrOfSteps*TimeConversion(InternalUnits,InputUnits), TimeUnit(InputUnits), &
                     NrOfSteps, NrOfPrintSteps
 
-      WRITE(*, 904) 1./EquilGamma*TimeConversion(InternalUnits,InputUnits), TimeUnit(InputUnits), &
+      WRITE(*, 905) 1./EquilGamma*TimeConversion(InternalUnits,InputUnits), TimeUnit(InputUnits), &
                  EquilTStep*TimeConversion(InternalUnits,InputUnits), TimeUnit(InputUnits), &
                  EquilTStep*NrEquilibSteps*TimeConversion(InternalUnits,InputUnits), TimeUnit(InputUnits), &
                  NrEquilibSteps
@@ -181,17 +187,23 @@ MODULE ScatteringSimulation
 
    902 FORMAT(" * Initial conditions of the atom-surface system ", /,&
               " * Initial distance of the scatterer:           ",F10.4,1X,A,/,&
-              " * Initial energy of the scatterer:             ",F10.4,1X,A,/ )
-!               " * Nr of impact parameter values:               ",I10,       /,&
-!               " * Max value of impact parameter:               ",F10.4,1X,A,/ )
+              " * Initial energy of the scatterer:             ",F10.4,1X,A,/,&
+              " * Initial impact parameter fixed to zero for collinear approach ",/ )
 
-   903 FORMAT(" * Dynamical simulation variables               ",           /,&
+
+   903 FORMAT(" * Initial conditions of the atom-surface system ", /,&
+              " * Initial distance of the scatterer:           ",F10.4,1X,A,/,&
+              " * Initial energy of the scatterer:             ",F10.4,1X,A,/,&
+              " * Nr of impact parameter values:               ",I10,       /,&
+              " * Max value of impact parameter:               ",F10.4,1X,A,/ )
+
+   904 FORMAT(" * Dynamical simulation variables               ",           /,&
               " * Propagation time step:                       ",F10.4,1X,A,/,&
               " * Propagation total time:                      ",F10.4,1X,A,/,&
               " * Nr of time steps of each trajectory:         ",I10,       /,&
               " * Nr of print steps of each trajectory:        ",I10,       / )
 
-   904 FORMAT(" * Bath equilibration variables                 ",           /,&
+   905 FORMAT(" * Bath equilibration variables                 ",           /,&
               " * Relaxation time of the Langevin dynamics:    ",F10.4,1X,A,/,&
               " * Equilibration time step:                     ",F10.4,1X,A,/,&
               " * Equilibration total time:                    ",F10.4,1X,A,/,&
