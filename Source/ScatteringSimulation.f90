@@ -535,12 +535,22 @@ MODULE ScatteringSimulation
             !*************************************************************
 
             ! Compute energy expectation values
-            EnergyExpect = ExpectationValues( X, V )
-            KinScatter   = EnergyExpect(1)
-            KinSubstrate = SUM(EnergyExpect(2:NSys+1))
-            KinEnergy    = KinScatter + KinSubstrate
-            PotEnergy    = SUM(EnergyExpect(NSys+2:NSys+4))
-            TotEnergy    = PotEnergy + KinEnergy
+            SELECT CASE( GetPotentialID() )
+                CASE( ELEYRIDEAL_3D )
+                        EnergyExpect = ExpectationValues( X, V )
+                        KinScatter   = EnergyExpect(1)
+                        KinSubstrate = SUM(EnergyExpect(2:NSys+1))
+                        KinEnergy    = KinScatter + KinSubstrate
+                        PotEnergy    = SUM(EnergyExpect(NSys+2:NSys+4))
+                        TotEnergy    = PotEnergy + KinEnergy
+                CASE( ELEYRIDEAL_7D )
+                        EnergyExpect = ExpectationValues( X, V )
+                        KinScatter   = SUM(EnergyExpect(1:3))
+                        KinSubstrate = SUM(EnergyExpect(4:NSys+1))
+                        KinEnergy    = KinScatter + KinSubstrate
+                        PotEnergy    = SUM(EnergyExpect(NSys+2:NSys+4))
+                        TotEnergy    = PotEnergy + KinEnergy
+            END SELECT
 
             ! PRINT INITIAL CONDITIONS of THE TRAJECTORY
             WRITE(*,600)  PotEnergy*EnergyConversion(InternalUnits,InputUnits), EnergyUnit(InputUnits),    &
@@ -598,12 +608,22 @@ MODULE ScatteringSimulation
                   IF ( kStep > NrOfPrintSteps ) CYCLE
 
                   ! Compute energy expectation values
-                  EnergyExpect = ExpectationValues( X, V )
-                  KinScatter   = EnergyExpect(1)
-                  KinSubstrate = SUM(EnergyExpect(2:NSys+1))
-                  KinEnergy    = KinScatter + KinSubstrate
-                  PotEnergy    = SUM(EnergyExpect(NSys+2:NSys+4))
-                  TotEnergy    = PotEnergy + KinEnergy
+                  SELECT CASE( GetPotentialID() )
+                        CASE( ELEYRIDEAL_3D )
+                                EnergyExpect = ExpectationValues( X, V )
+                                KinScatter   = EnergyExpect(1)
+                                KinSubstrate = SUM(EnergyExpect(2:NSys+1))
+                                KinEnergy    = KinScatter + KinSubstrate
+                                PotEnergy    = SUM(EnergyExpect(NSys+2:NSys+4))
+                                TotEnergy    = PotEnergy + KinEnergy
+                        CASE( ELEYRIDEAL_7D )
+                                EnergyExpect = ExpectationValues( X, V )
+                                KinScatter   = SUM(EnergyExpect(1:3))
+                                KinSubstrate = SUM(EnergyExpect(4:NSys+1))
+                                KinEnergy    = KinScatter + KinSubstrate
+                                PotEnergy    = SUM(EnergyExpect(NSys+2:NSys+4))
+                                TotEnergy    = PotEnergy + KinEnergy
+                  END SELECT
 
                   ! check the channel which corresponds to the current coordinates of the trajectory
                   iChan = GetCurrentChannel(X(1:NSys))
