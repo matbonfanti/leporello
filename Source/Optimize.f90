@@ -491,7 +491,7 @@ MODULE Optimize
          GradNorm  = SQRT(TheOneWithVectorDotVector(WrkForces, WrkForces) / NOpt )
 
          ! When the gradient is large, switch off newton and use gradient only
-         IF ( GradNorm > 1.E-6 ) THEN
+         IF ( GradNorm > 1.E-3 ) THEN
             SteepestDescent = .TRUE.
          ELSE
             SteepestDescent = .FALSE.

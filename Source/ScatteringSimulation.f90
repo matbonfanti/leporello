@@ -382,8 +382,8 @@ MODULE ScatteringSimulation
       END IF
 
       ! Optimize the potential and find the position of the local minimum
-      OptMask = (/ (.FALSE., iCoord=1,NScatter), (.TRUE., iCoord=NScatter+1,NDim ) /)
-      XEquil = NewtonLocator( GetPotAndForces=ScatteringPotential, GetHessian=GetNonMassScaledHessian, StartX=X, NMaxIter=3*10**3, &
+      OptMask = (/ (.FALSE., iCoord=1,NScatter+2), (.TRUE., iCoord=NScatter+3,NDim ) /)
+      XEquil = NewtonLocator( GetPotAndForces=ScatteringPotential, GetHessian=GetNonMassScaledHessian, StartX=X, NMaxIter=10**3, &
             GradThresh=1.E-6, DisplThresh=1.E-6, SmallDelta=1.E-3, Mask = OptMask )
 
       ! compute the hessian in mass scaled coordinates
