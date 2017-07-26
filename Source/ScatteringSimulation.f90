@@ -424,7 +424,7 @@ MODULE ScatteringSimulation
          WRITE(NrmlMdsUnit, "(/,A,/)")  &
                "# Normal modes frequencies for the final asymptotic geometry ("//TRIM(FreqUnit(InputUnits))//")"
          DO iCoord = 1, NDim
-            IF ( NormalModesVal(iCoord) >= 0. ) THEN
+            IF ( FinalEigenVal(iCoord) >= 0. ) THEN
                WRITE(NrmlMdsUnit,*) iCoord, SQRT(ABS(FinalEigenVal(iCoord)))*FreqConversion(InternalUnits, InputUnits)
             ELSE
                WRITE(NrmlMdsUnit,*) iCoord, SQRT(ABS(FinalEigenVal(iCoord)))*FreqConversion(InternalUnits, InputUnits), " *i"
