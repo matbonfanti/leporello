@@ -1004,7 +1004,7 @@ MODULE ScatteringSimulation
       REAL, DIMENSION(:), INTENT(IN)  :: X
       REAL, DIMENSION(:), INTENT(IN)  :: V
 
-      REAL :: VCoupling, VBath, ReducedMass
+      REAL :: VCoupling, VBath, ReducedMass, v_incidon, v_targon
       INTEGER :: i
 
       ! 1 -- NSys) kinetic energies of the subsystem coordinates
@@ -1077,7 +1077,7 @@ MODULE ScatteringSimulation
          SigmaV = sqrt( Temperature )
 
          ! the coordinate is bound
-         IF ( NormalModesVal(i) > 5.E-6 ) THEN
+         IF ( NormalModesVal(i) > 0.0 ) THEN
             ! set frequency of the normal mode
             CarbonFreq = SQRT( NormalModesVal(i) )
 
@@ -1101,6 +1101,7 @@ MODULE ScatteringSimulation
          ENDIF
 
       END DO
+
 
       ! TRASFORM BACK TO ORIGINAL FRAME AND TO NOT-MASS-WEIGHTED COORDINATES
       X = TheOneWithMatrixVectorProduct( NormalModesVec, X )
