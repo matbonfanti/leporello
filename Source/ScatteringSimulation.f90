@@ -1077,7 +1077,7 @@ MODULE ScatteringSimulation
          SigmaV = sqrt( Temperature )
 
          ! the coordinate is bound
-         IF ( NormalModesVal(i) > 0.0 ) THEN
+         IF ( NormalModesVal(i) > 1.E-10 ) THEN
             ! set frequency of the normal mode
             CarbonFreq = SQRT( NormalModesVal(i) )
 
